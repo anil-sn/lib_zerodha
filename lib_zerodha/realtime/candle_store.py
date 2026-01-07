@@ -1,7 +1,5 @@
 """In-memory candle aggregation and persistent storage.
-
-Inspired by PKScreener's InMemoryCandleStore and LocalCandleDatabase
-for real-time candle aggregation from tick data.
+   Provides classesfor real-time candle aggregation from tick data.
 """
 
 import threading

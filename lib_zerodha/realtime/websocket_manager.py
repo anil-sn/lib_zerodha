@@ -1,7 +1,5 @@
 """Real-time WebSocket client with advanced connection management.
-
-Inspired by PKScreener's ZerodhaWebSocketClient and KiteTokenWatcher architecture
-for robust real-time data handling with 500+ instrument connections per socket.
+   for robust real-time data handling with 500+ instrument connections per socket.
 """
 
 import json
@@ -299,9 +297,7 @@ class ZerodhaWebSocketManager:
 
 class KiteTokenWatcher:
     """Token-based tick data processor and aggregator.
-    
-    Processes incoming tick data and maintains real-time candle aggregation
-    similar to PKScreener's KiteTokenWatcher.
+       Processes incoming tick data and maintains real-time candle aggregation.   
     """
     
     def __init__(self, candle_store=None):

@@ -406,8 +406,3 @@ db.cleanup_old_data(days=30)
 ## 📝 License
 
 MIT License - Built on top of the official Kite Connect API
-
-## 🤝 Contributing
-
-Built from PKScreener project with comprehensive API coverage. 
-Contributions welcome for additional features and optimizations.

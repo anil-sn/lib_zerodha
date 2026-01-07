@@ -61,9 +61,4 @@ setup(
         "zerodha", "kite", "trading", "api", "stocks", "finance", 
         "market-data", "websocket", "real-time", "nse", "bse"
     ],
-    project_urls={
-        "Bug Reports": "https://github.com/pkjmesra/PKScreener/issues",
-        "Source": "https://github.com/pkjmesra/PKScreener",
-        "Documentation": "https://pkjmesra.github.io/PKScreener/",
-    },
 )
