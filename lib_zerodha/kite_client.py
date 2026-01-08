@@ -57,7 +57,8 @@ class KiteClient:
         self.session_manager = SessionManager(
             api_key, api_secret, 
             auth_instance=self.auth,
-            session_file=session_file
+            session_file=session_file,
+            config=self.config
         )
         
         # Trading modules - delegate all functionality to these
