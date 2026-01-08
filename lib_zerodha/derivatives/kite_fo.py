@@ -54,7 +54,8 @@ class KiteFO:
             response.raise_for_status()
             
             # Parse CSV response
-            df = pd.read_csv(response.content.decode('utf-8').splitlines())
+            import io
+            df = pd.read_csv(io.StringIO(response.content.decode('utf-8')))
             
             # Filter only F&O instruments
             fo_df = df[df['instrument_type'].isin(['FUT', 'CE', 'PE'])].copy()

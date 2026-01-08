@@ -7,15 +7,15 @@ import threading
 import pandas as pd
 from dataclasses import dataclass, field
 
-from .data_models import Quote, OHLC, HistoricalData
+from ..models.market_data import Quote, OHLC, HistoricalData
 
 @dataclass
 class CandleData:
     """Internal candle data structure for aggregation."""
-    open: float
-    high: float
-    low: float
-    close: float
+    open: float = 0.0
+    high: float = 0.0
+    low: float = 0.0
+    close: float = 0.0
     volume: int = 0
     timestamp: datetime = field(default_factory=datetime.now)
     tick_count: int = 0

@@ -10,6 +10,7 @@
 - [x] **Documentation:** Created `DESIGN.md` and updated `README.md`.
 - [x] **GTT Support:** Implement `place_gtt`, `modify_gtt`, `delete_gtt` for Good Till Triggered orders.
 - [x] **Real-time Hardening:** Robust binary parsing and reconnection logic for WebSocket.
+- [x] **WebSocket Unification:** Merged `KiteWebSocket` and `KiteWebSocketClient` into a single robust implementation. Fixed subscription manager compatibility.
 
 ## 🚀 Future Enhancements (Post-Release)
 

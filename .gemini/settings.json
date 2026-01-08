@@ -14,7 +14,7 @@
     "docstring_style": "google"
   },
   "output": {
-    "format": "markdown",
+    "format": "text",
     "include_error_handling_logic": "comprehensive",
     "cli_ux_best_practices": true
   },

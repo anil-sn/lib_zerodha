@@ -2,6 +2,15 @@
 
 A production-ready, modular, and secure Python client for the Zerodha Kite Connect API (v3).
 
+python3 -m py_compile lib_zerodha/**/*.py
+
+PYTHONPATH=. pytest
+PYTHONPATH=. pytest -v
+PYTHONPATH=. pytest -x
+PYTHONPATH=. pytest --trace-config
+PYTHONPATH=. pytest --cov=lib_zerodha
+PYTHONPATH=. pytest --cov=lib_zerodha --cov-fail-under=95
+
 ## 🌟 Features
 
 *   **Modular Architecture:** Clean separation of concerns (Auth, Orders, Market Data, Portfolio).

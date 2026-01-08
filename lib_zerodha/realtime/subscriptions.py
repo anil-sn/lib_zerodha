@@ -33,7 +33,7 @@ class SubscriptionManager:
         # Register WebSocket handlers
         self.websocket.on_tick(self._handle_ticks)
         self.websocket.on_connect(self._on_websocket_connect)
-        self.websocket.on_disconnect(self._on_websocket_disconnect)
+        self.websocket.on_close(self._on_websocket_close)
         self.websocket.on_error(self._on_websocket_error)
         
         # Status tracking
@@ -67,10 +67,10 @@ class SubscriptionManager:
         self._is_connected = True
         self._notify_status_change('connected')
     
-    def _on_websocket_disconnect(self):
+    def _on_websocket_close(self, code, reason):
         """Handle WebSocket disconnection."""
         self._is_connected = False
-        self._notify_status_change('disconnected')
+        self._notify_status_change('disconnected', {'code': code, 'reason': reason})
     
     def _on_websocket_error(self, error: Exception):
         """Handle WebSocket error."""

@@ -5,15 +5,6 @@
 **Compliance:** Kite Connect API v3
 
 ---
-
-   1. Architecture: Transformed a monolithic codebase into a clean Facade Pattern, delegating logic to specialized modules (auth, orders, market_data, portfolio, realtime).
-   2. Compliance: Aligned data models (Quote, Order, Holding) with official Kite Connect v3 schemas and implemented forward-compatible parsing.
-   3. Security: Implemented AES encryption for session tokens and atomic file locking to prevent corruption and unauthorized access.
-   4. Stability: Fixed critical WebSocket bugs (binary parsing, reconnection) and standardized error handling.
-   5. Features: Added support for GTT orders and Position Conversion, closing gaps with the official SDK.
-   6. Quality: Achieved 100% pass rate on a comprehensive test suite (50 tests) covering all core workflows.
-   7. Documentation: Produced detailed DESIGN.md, updated README.md, and maintained a clean project structure.
-
 ## 1. Executive Summary
 
 `lib_zerodha` is a production-ready Python client for the Zerodha Kite Connect trading API. It is designed to be:
@@ -72,9 +63,12 @@ The library implements the **Facade Design Pattern**.
 *   **Margins:** `get_margins` provides detailed equity and commodity margin utilization.
 
 ### 3.5 Real-time Data (`lib_zerodha.realtime`)
-*   **`KiteWebSocket`:** A threaded WebSocket client.
+*   **`KiteWebSocket`:** A unified, robust threaded WebSocket client.
+    *   **Features:** Handles connection management, subscription (LTP, Quote, Full), and mode switching.
+    *   **Event-Driven:** Provides a clean callback interface (`on_tick`, `on_connect`, `on_close`, `on_error`) for easy integration.
 *   **Binary Parsing:** Implements a robust binary parser for the Kite Ticker stream. It validates packet lengths and offsets dynamically to prevent crashes on malformed data.
 *   **Reconnection:** Uses an exponential backoff strategy (non-blocking thread) to reconnect automatically upon network failure.
+*   **Manager:** `ZerodhaWebSocketManager` provides high-level management for multiple connections (load balancing 500+ instruments) and specialized data handling.
 
 ### 3.6 Models (`lib_zerodha.models`)
 *   **Resilient Dataclasses:** All data models (`Quote`, `Order`, `Holding`, `Position`) use a `from_dict` factory method.

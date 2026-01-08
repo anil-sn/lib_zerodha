@@ -6,7 +6,7 @@ import time
 import signal
 import sys
 from threading import Event
-from lib_zerodha import KiteWebSocketClient, DataProcessor
+from lib_zerodha import KiteWebSocket, DataProcessor
 from lib_zerodha.exceptions import WebSocketError
 
 class RealTimeDataExample:
@@ -37,7 +37,7 @@ class RealTimeDataExample:
             self.ws.disconnect()
         sys.exit(0)
     
-    def on_connect(self, ws):
+    def on_connect(self):
         """WebSocket connection callback."""
         print("✅ WebSocket connected!")
         
@@ -46,30 +46,30 @@ class RealTimeDataExample:
         print(f"Subscribing to {len(tokens_list)} instruments...")
         
         # Subscribe with different modes
-        ws.subscribe(tokens_list[:3], mode="full")  # Full data for first 3
-        ws.subscribe(tokens_list[3:], mode="quote")  # Quote data for rest
+        self.ws.subscribe(tokens_list[:3], mode="full")  # Full data for first 3
+        self.ws.subscribe(tokens_list[3:], mode="quote")  # Quote data for rest
         
         print("Subscription complete. Waiting for ticks...")
     
-    def on_tick(self, ws, ticks):
+    def on_tick(self, ticks):
         """Process incoming ticks."""
         for tick in ticks:
             # Process tick through data processor
             self.processor.process_tick(tick)
             
-            token = tick.get('instrument_token')
+            token = tick.instrument_token
             symbol = self.tokens.get(token, str(token))
-            ltp = tick.get('last_price', 0)
+            ltp = tick.last_price
             
             # Print live updates (throttled)
             if int(time.time()) % 5 == 0:  # Every 5 seconds
                 print(f"{symbol}: ₹{ltp:,.2f}", end=" | ")
     
-    def on_error(self, ws, error):
+    def on_error(self, error):
         """Handle WebSocket errors."""
         print(f"❌ WebSocket error: {error}")
     
-    def on_close(self, ws, close_status_code, close_msg):
+    def on_close(self, close_status_code, close_msg):
         """Handle WebSocket close."""
         print(f"\n🔌 WebSocket disconnected: {close_status_code}")
     
@@ -118,14 +118,16 @@ class RealTimeDataExample:
             print("🚀 Starting real-time data streaming...")
             
             # Initialize WebSocket client
-            self.ws = KiteWebSocketClient(
+            self.ws = KiteWebSocket(
                 api_key=os.getenv("KITE_API_KEY"),
-                access_token=os.getenv("KITE_ACCESS_TOKEN"),
-                on_connect=self.on_connect,
-                on_tick=self.on_tick,
-                on_error=self.on_error,
-                on_close=self.on_close
+                access_token=os.getenv("KITE_ACCESS_TOKEN")
             )
+            
+            # Register handlers
+            self.ws.on_connect(self.on_connect)
+            self.ws.on_tick(self.on_tick)
+            self.ws.on_error(self.on_error)
+            self.ws.on_close(self.on_close)
             
             # Connect WebSocket
             self.ws.connect(threaded=True)

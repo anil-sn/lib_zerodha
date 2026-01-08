@@ -5,7 +5,7 @@ from typing import Dict, List, Callable, Optional, Any
 from collections import deque, defaultdict
 import threading
 
-from ..models.market_data import Tick, Quote
+from ..models.market_data import Tick, Quote, OHLC
 from ..storage.base_storage import TickStorage
 from ..exceptions.api_exceptions import DataNotAvailableError
 
@@ -285,17 +285,11 @@ class RealTimeQuoteManager:
                 instrument_token=instrument_token,
                 timestamp=tick.timestamp,
                 last_price=tick.last_price,
-                volume=tick.volume,
-                bid=getattr(tick, 'bid', None),
-                ask=getattr(tick, 'ask', None),
-                bid_quantity=getattr(tick, 'bid_quantity', None),
-                ask_quantity=getattr(tick, 'ask_quantity', None),
-                open_price=getattr(tick, 'open', None),
-                high_price=getattr(tick, 'high', None),
-                low_price=getattr(tick, 'low', None),
-                close_price=getattr(tick, 'close', None),
-                change=None,  # Calculate separately if needed
-                change_percent=None
+                volume=tick.volume or 0,
+                average_price=tick.average_price or 0.0,
+                ohlc=tick.ohlc if tick.ohlc else OHLC(0,0,0,0),
+                depth=tick.depth if tick.depth else {"buy": [], "sell": []},
+                oi=tick.oi or 0
             )
             
             self._quotes[instrument_token] = quote

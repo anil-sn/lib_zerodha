@@ -1,40 +1,4 @@
-"""Comprehensive examples for lib_zerodha trading system integration.
-
-This file demonstrates all the enhanced features including:
-- Complete Kite Connect API usage
-- GTT (Good Till Triggered) orders
-- Mutual Fund operations
-- Position conversion
-- Margin calculations
-- Database storage integration
-"""
-
-import sys
-import os
-from datetime import datetime, date, timedelta
-import pandas as pd
-
-# Add lib_zerodha to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-from lib_zerodha import (
-    KiteClient, KiteWebSocketClient, DataProcessor, TradingDatabase,
-    Quote, Order, Position, GTTTrigger, MFHolding
-)
-
-
-def comprehensive_trading_example():
-    """Comprehensive example showing all trading system features."""
-    
-    # Initialize components
-    api_key = "your_api_key"
-    access_token = "your_access_token"
-    
-    # Initialize clients and database
-    kite = KiteClient(api_key, access_token)
-    db = TradingDatabase("trading_system.db")
-    
-    print("=== Kite Connect Trading System Integration ===\\n")
+"=== Kite Connect Trading System Integration ===\n"
     
     # 1. Basic Market Data Operations
     print("1. Market Data Operations:")
@@ -44,23 +8,17 @@ def comprehensive_trading_example():
         quotes = kite.get_quote(instruments)
         
         for token, quote_data in quotes.items():
-            quote = Quote(
-                instrument_token=int(token),
-                timestamp=datetime.now(),
-                last_price=quote_data['last_price'],
-                volume=quote_data['volume'],
-                average_price=quote_data.get('average_price', 0),
-                ohlc=quote_data['ohlc']
-            )
+            # quote_data is already a Quote object from get_quote
+            quote = quote_data 
             
             # Store in database
             db.store_quote(quote)
-            print(f"  {quote_data.get('instrument_token', token)}: ₹{quote.last_price}")
+            print(f"  {quote.instrument_token}: ₹{quote.last_price}")
         
-        print("  ✓ Market data stored in database\\n")
+        print("  ✓ Market data stored in database\n")
         
     except Exception as e:
-        print(f"  ✗ Market data error: {e}\\n")
+        print(f"  ✗ Market data error: {e}\n")
     
     # 2. Advanced Order Management
     print("2. Advanced Order Management:")
@@ -272,12 +230,12 @@ def comprehensive_trading_example():
         gainers_losers = db.get_top_gainers_losers(5)
         
         if not gainers_losers['gainers'].empty:
-            print("\\n    Top Gainers:")
+            print("\n    Top Gainers:")
             for _, stock in gainers_losers['gainers'].head(3).iterrows():
                 print(f"      {stock['tradingsymbol']}: +{stock['day_change_percentage']:.2f}%")
         
         if not gainers_losers['losers'].empty:
-            print("\\n    Top Losers:")
+            print("\n    Top Losers:")
             for _, stock in gainers_losers['losers'].head(3).iterrows():
                 print(f"      {stock['tradingsymbol']}: {stock['day_change_percentage']:.2f}%")
         
@@ -300,13 +258,13 @@ def comprehensive_trading_example():
     except Exception as e:
         print(f"  ✗ Database statistics error: {e}")
     
-    print("\\n=== Trading System Integration Complete ===")
+    print("\n=== Trading System Integration Complete ===")
 
 
 def websocket_streaming_example():
     """Example of real-time data streaming with database storage."""
     
-    print("\\n=== Real-time Data Streaming Example ===")
+    print("\n=== Real-time Data Streaming Example ===")
     
     api_key = "your_api_key"
     access_token = "your_access_token"
@@ -315,17 +273,18 @@ def websocket_streaming_example():
     processor = DataProcessor()
     
     # WebSocket event handlers
-    def on_ticks(ws, ticks):
+    def on_ticks(ticks):
         """Handle incoming tick data."""
         for tick in ticks:
             # Convert to Quote object
+            # tick is already a Tick object from our new KiteWebSocket
             quote = Quote(
-                instrument_token=tick['instrument_token'],
+                instrument_token=tick.instrument_token,
                 timestamp=datetime.now(),
-                last_price=tick['last_price'],
-                volume=tick.get('volume_traded', 0),
-                average_price=tick.get('average_traded_price', 0),
-                ohlc=tick.get('ohlc', {})
+                last_price=tick.last_price,
+                volume=getattr(tick, 'volume', 0),
+                average_price=getattr(tick, 'average_price', 0),
+                ohlc=getattr(tick, 'ohlc', None)
             )
             
             # Store in database
@@ -334,25 +293,25 @@ def websocket_streaming_example():
             # Process with aggregator
             processor.add_quote(quote)
             
-            print(f"Stored tick: {tick['instrument_token']} @ ₹{tick['last_price']}")
+            print(f"Stored tick: {tick.instrument_token} @ ₹{tick.last_price}")
     
-    def on_connect(ws, response):
+    def on_connect():
         """Handle WebSocket connection."""
         print("Connected to WebSocket")
         # Subscribe to instruments
         instruments = [738561, 779521]  # Reliance, HDFC Bank
         ws.subscribe(instruments)
-        ws.set_mode(ws.MODE_FULL, instruments)
+        ws.set_mode(instruments, ws.MODE_FULL)
     
-    def on_error(ws, code, reason):
+    def on_error(error):
         """Handle WebSocket errors."""
-        print(f"WebSocket error: {code} - {reason}")
+        print(f"WebSocket error: {error}")
     
     # Initialize WebSocket client
-    ws = KiteWebSocketClient(api_key, access_token, debug=True)
-    ws.on_ticks = on_ticks
-    ws.on_connect = on_connect  
-    ws.on_error = on_error
+    ws = KiteWebSocket(api_key, access_token)
+    ws.on_tick(on_ticks)
+    ws.on_connect(on_connect)
+    ws.on_error(on_error)
     
     print("Starting WebSocket connection...")
     print("Press Ctrl+C to stop")
@@ -360,8 +319,8 @@ def websocket_streaming_example():
     try:
         ws.connect(threaded=False)  # Blocking connection
     except KeyboardInterrupt:
-        print("\\nStopping WebSocket connection...")
-        ws.close()
+        print("\nStopping WebSocket connection...")
+        ws.disconnect()
         db.close()
         print("Stopped.")
 
@@ -369,7 +328,7 @@ def websocket_streaming_example():
 def portfolio_analysis_example():
     """Example of portfolio analysis using stored data."""
     
-    print("\\n=== Portfolio Analysis Example ===")
+    print("\n=== Portfolio Analysis Example ===")
     
     db = TradingDatabase("trading_system.db")
     
@@ -383,7 +342,7 @@ def portfolio_analysis_example():
         # Get portfolio performance
         portfolio_history = db.get_portfolio_history(days=7)
         if not portfolio_history.empty:
-            print("\\nWeekly Portfolio Performance:")
+            print("\nWeekly Portfolio Performance:")
             for date in portfolio_history['date'].unique():
                 day_data = portfolio_history[portfolio_history['date'] == date]
                 equity_pnl = day_data[
@@ -395,7 +354,7 @@ def portfolio_analysis_example():
         # Get order analysis
         recent_orders = db.get_orders(start_date=datetime.now() - timedelta(days=1))
         if not recent_orders.empty:
-            print(f"\\nLast 24 hours: {len(recent_orders)} orders")
+            print(f"\nLast 24 hours: {len(recent_orders)} orders")
             
             status_counts = recent_orders['status'].value_counts()
             for status, count in status_counts.items():
@@ -405,7 +364,7 @@ def portfolio_analysis_example():
         positions = db.get_positions()
         if not positions.empty:
             total_pnl = positions['pnl'].sum()
-            print(f"\\nCurrent positions P&L: ₹{total_pnl:.2f}")
+            print(f"\nCurrent positions P&L: ₹{total_pnl:.2f}")
         
     except Exception as e:
         print(f"Analysis error: {e}")
@@ -415,14 +374,14 @@ def portfolio_analysis_example():
 
 
 if __name__ == "__main__":
-    print("Lib Zerodha - Comprehensive Trading System Integration\\n")
+    print("Lib Zerodha - Comprehensive Trading System Integration\n")
     print("Choose an example to run:")
     print("1. Comprehensive trading example")
     print("2. Real-time WebSocket streaming (requires valid API credentials)")
     print("3. Portfolio analysis from stored data")
     
     try:
-        choice = input("\\nEnter your choice (1-3): ").strip()
+        choice = input("\nEnter your choice (1-3): ").strip()
         
         if choice == "1":
             comprehensive_trading_example()
@@ -435,7 +394,7 @@ if __name__ == "__main__":
             comprehensive_trading_example()
             
     except KeyboardInterrupt:
-        print("\\nExample interrupted by user.")
+        print("\nExample interrupted by user.")
     except Exception as e:
-        print(f"\\nExample error: {e}")
+        print(f"\nExample error: {e}")
         print("Make sure to set valid API credentials before running live examples.")
