@@ -3,10 +3,11 @@
 from typing import Dict, List, Set, Optional, Any, Callable
 from datetime import datetime
 import threading
+from dataclasses import asdict
 
 from ..models.market_data import Tick
 from .kite_websocket import KiteWebSocket
-from .data_handlers import TickAggregator, MarketDepthProcessor, RealTimeQuoteManager
+from ..utils.data_processor import DataProcessor
 
 
 class SubscriptionManager:
@@ -26,9 +27,7 @@ class SubscriptionManager:
         self._lock = threading.RLock()
         
         # Data processors
-        self.tick_aggregator = TickAggregator()
-        self.depth_processor = MarketDepthProcessor()
-        self.quote_manager = RealTimeQuoteManager()
+        self.data_processor = DataProcessor()
         
         # Register WebSocket handlers
         self.websocket.on_tick(self._handle_ticks)
@@ -51,9 +50,7 @@ class SubscriptionManager:
         
         for tick in ticks:
             # Process through data handlers
-            self.tick_aggregator.process_tick(tick)
-            self.depth_processor.process_tick(tick)
-            self.quote_manager.process_tick(tick)
+            self.data_processor.process_tick(asdict(tick))
             
             # Notify tick callbacks
             for callback in self._on_tick_callbacks:
@@ -235,7 +232,7 @@ class SubscriptionManager:
     
     def on_quote_update(self, callback: Callable[[Dict[str, Any]], None]):
         """Register quote update handler."""
-        self.quote_manager.on_quote_update(callback)
+        self.data_processor.add_quote_callback(callback)
     
     def on_status_change(self, callback: Callable[[Dict[str, Any]], None]):
         """Register status change handler."""
@@ -298,7 +295,11 @@ class SubscriptionManager:
         
         if group_name in self._subscription_groups:
             tokens = list(self._subscription_groups[group_name])
-            quotes = self.quote_manager.get_quotes(tokens)
+            quotes = {}
+            for token in tokens:
+                q = self.data_processor.get_latest_quote(token)
+                if q:
+                    quotes[token] = q
             
             return {
                 'name': name,

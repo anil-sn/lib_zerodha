@@ -9,7 +9,7 @@ import websocket
 import struct
 import logging
 
-from ..config import config
+from ..config.base_config import Config
 from ..exceptions.api_exceptions import WebSocketError, ConnectionError, SubscriptionError
 from ..models.market_data import Tick
 
@@ -31,7 +31,7 @@ class KiteWebSocket:
         self.access_token = access_token
         self.user_id = user_id
         self.public_token = public_token
-        self.config = config_obj or config
+        self.config = config_obj or Config.from_env()
         
         self._ws = None
         self._connected = False
@@ -39,6 +39,7 @@ class KiteWebSocket:
         self._max_reconnect_attempts = 10
         
         self._subscriptions = {}  # token -> mode
+        self.precision_map = {} # token -> divisor
         
         # Event handlers
         self._on_tick_handlers = []
@@ -52,6 +53,11 @@ class KiteWebSocket:
     def is_connected(self) -> bool:
         """Check if WebSocket is connected."""
         return self._connected
+        
+    def set_precision(self, token: int, divisor: int):
+        """Set precision divisor for an instrument (e.g., 10000 for CDS)."""
+        with self._lock:
+            self.precision_map[token] = divisor
 
     def _get_url(self):
         return f"{self.config.websocket_url}?api_key={self.api_key}&access_token={self.access_token}"
@@ -99,10 +105,10 @@ class KiteWebSocket:
 
     def _get_precision(self, token: int) -> int:
         """Get precision divisor for instrument."""
-        # CDS segment instruments typically have tokens in specific ranges or use 4 decimal places.
-        # Without segment info in the tick, we rely on range heuristics or configuration.
-        # For now, default to 100 (2 decimals) as per standard equity/NFO.
-        # TODO: Allow user to inject precision map.
+        if token in self.precision_map:
+            return self.precision_map[token]
+            
+        # Default heuristics could go here if we had segment info
         return 100
 
     def _parse_packet(self, data: bytes) -> Optional[Tick]:
@@ -212,6 +218,8 @@ class KiteWebSocket:
                     'oi_day_high': oi_high,
                     'oi_day_low': oi_low,
                     'depth': depth,
+                    'last_trade_time': last_trade_time,
+                    'exchange_timestamp': exchange_timestamp,
                     'mode': self.MODE_FULL
                 })
             

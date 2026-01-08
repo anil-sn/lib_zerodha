@@ -29,10 +29,7 @@ def get_config() -> Type[Config]:
     return config_map.get(env, DevelopmentConfig)
 
 
-# Default configuration instance
-config = get_config().from_env()
-
 __all__ = [
     'Config', 'DevelopmentConfig', 'ProductionConfig', 
-    'TestingConfig', 'SandboxConfig', 'get_config', 'config'
+    'TestingConfig', 'SandboxConfig', 'get_config'
 ]

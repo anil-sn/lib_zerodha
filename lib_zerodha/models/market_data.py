@@ -87,6 +87,9 @@ class Tick:
     oi: Optional[int] = None
     ohlc: Optional[OHLC] = None
     depth: Optional[Dict[str, Any]] = None
+    last_trade_time: Optional[datetime] = None
+    exchange_timestamp: Optional[datetime] = None
+    mode: Optional[str] = None
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Tick':
@@ -99,6 +102,24 @@ class Tick:
             timestamp = datetime.fromisoformat(timestamp.replace(' ', 'T'))
         elif not isinstance(timestamp, datetime):
             timestamp = datetime.now()
+            
+        # Parse extra timestamps
+        last_trade_time = data.get('last_trade_time')
+        if isinstance(last_trade_time, int):
+             # Assuming unix timestamp from struct unpack
+             # However, Kite sends timestamps as seconds since epoch in binary?
+             # Docs say "4 bytes". It is likely Unix timestamp.
+             try:
+                 last_trade_time = datetime.fromtimestamp(last_trade_time)
+             except:
+                 last_trade_time = None
+                 
+        exchange_timestamp = data.get('exchange_timestamp')
+        if isinstance(exchange_timestamp, int):
+             try:
+                 exchange_timestamp = datetime.fromtimestamp(exchange_timestamp)
+             except:
+                 exchange_timestamp = None
         
         # Handle OHLC if present
         ohlc = None
@@ -120,5 +141,8 @@ class Tick:
             average_price=float(data.get('average_price', 0.0)),
             oi=data.get('oi'),
             ohlc=ohlc,
-            depth=data.get('depth')
+            depth=data.get('depth'),
+            last_trade_time=last_trade_time,
+            exchange_timestamp=exchange_timestamp,
+            mode=data.get('mode')
         )

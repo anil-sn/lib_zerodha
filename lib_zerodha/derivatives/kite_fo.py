@@ -5,7 +5,6 @@ import requests
 from datetime import datetime, date
 import pandas as pd
 
-from ..config import config
 from ..exceptions import APIError, NetworkError, ValidationError
 from ..models.derivatives import FOInstrument, OptionChain, OptionData
 from .option_chain import OptionChainAnalyzer
@@ -15,15 +14,17 @@ from .expiry_utils import ExpiryCalculator
 class KiteFO:
     """Handles Futures and Options trading and data."""
     
-    def __init__(self, session: requests.Session, get_auth_headers: callable):
+    def __init__(self, session: requests.Session, get_auth_headers: callable, config: Any):
         """Initialize F&O handler.
         
         Args:
             session: Requests session for API calls
             get_auth_headers: Function to get authentication headers
+            config: Configuration object
         """
         self.session = session
         self.get_auth_headers = get_auth_headers
+        self.config = config
         self.option_analyzer = OptionChainAnalyzer()
         self.expiry_calc = ExpiryCalculator()
     
@@ -47,9 +48,9 @@ class KiteFO:
         
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/instruments/{exchange}",
+                f"{self.config.base_url}/instruments/{exchange}",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             

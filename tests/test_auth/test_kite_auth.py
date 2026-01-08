@@ -19,7 +19,8 @@ class TestKiteAuth:
         """Create KiteAuth instance for testing."""
         return KiteAuth(
             api_key="test_api_key",
-            api_secret="test_api_secret"
+            api_secret="test_api_secret",
+            config=test_config
         )
     
     def test_init(self, auth):

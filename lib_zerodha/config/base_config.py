@@ -42,6 +42,3 @@ class Config:
     def validate(self) -> bool:
         """Validate required configuration."""
         return bool(self.api_key)
-
-# Global configuration instance
-config = Config.from_env()

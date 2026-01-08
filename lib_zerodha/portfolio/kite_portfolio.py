@@ -4,7 +4,6 @@ from typing import Dict, List, Optional, Union, Any
 import requests
 from datetime import datetime
 
-from ..config import config
 from ..exceptions import APIError, NetworkError, ValidationError
 from ..models.portfolio import Position, Holding, Portfolio
 
@@ -12,15 +11,17 @@ from ..models.portfolio import Position, Holding, Portfolio
 class KitePortfolio:
     """Handles portfolio management including positions and holdings."""
     
-    def __init__(self, session: requests.Session, get_auth_headers: callable):
+    def __init__(self, session: requests.Session, get_auth_headers: callable, config: Any):
         """Initialize portfolio management.
         
         Args:
             session: Requests session for API calls
             get_auth_headers: Function to get authentication headers
+            config: Configuration object
         """
         self.session = session
         self.get_auth_headers = get_auth_headers
+        self.config = config
     
     def get_positions(self) -> Dict[str, List[Position]]:
         """Get current positions.
@@ -34,9 +35,9 @@ class KitePortfolio:
         """
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/portfolio/positions",
+                f"{self.config.base_url}/portfolio/positions",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -70,9 +71,9 @@ class KitePortfolio:
         """
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/portfolio/holdings",
+                f"{self.config.base_url}/portfolio/holdings",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -141,10 +142,10 @@ class KitePortfolio:
         
         try:
             response = self.session.put(
-                f"{config.BASE_URL}/portfolio/positions",
+                f"{self.config.base_url}/portfolio/positions",
                 headers=self.get_auth_headers(),
                 data=conversion_data,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -173,7 +174,7 @@ class KitePortfolio:
             APIError: If API request fails
             NetworkError: If network request fails
         """
-        url = f"{config.BASE_URL}/user/margins"
+        url = f"{self.config.base_url}/user/margins"
         if segment:
             url += f"/{segment}"
             
@@ -181,7 +182,7 @@ class KitePortfolio:
             response = self.session.get(
                 url,
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             

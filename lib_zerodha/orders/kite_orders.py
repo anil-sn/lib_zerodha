@@ -5,7 +5,6 @@ import requests
 import json
 from datetime import datetime
 
-from ..config import config
 from ..exceptions import APIError, NetworkError, ValidationError, OrderError
 from .order_types import OrderType, ProductType, TransactionType, Variety
 from .order_validation import OrderValidator
@@ -14,15 +13,17 @@ from .order_validation import OrderValidator
 class KiteOrders:
     """Handles order placement, modification, and management."""
     
-    def __init__(self, session: requests.Session, get_auth_headers: callable):
+    def __init__(self, session: requests.Session, get_auth_headers: callable, config: Any):
         """Initialize order management.
         
         Args:
             session: Requests session for API calls
             get_auth_headers: Function to get authentication headers
+            config: Configuration object
         """
         self.session = session
         self.get_auth_headers = get_auth_headers
+        self.config = config
         self.validator = OrderValidator()
     
     def place_order(self,
@@ -112,10 +113,10 @@ class KiteOrders:
         
         try:
             response = self.session.post(
-                f"{config.BASE_URL}/orders/{variety}",
+                f"{self.config.base_url}/orders/{variety}",
                 headers=self.get_auth_headers(),
                 data=order_data,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -188,10 +189,10 @@ class KiteOrders:
         
         try:
             response = self.session.put(
-                f"{config.BASE_URL}/orders/{variety}/{order_id}",
+                f"{self.config.base_url}/orders/{variety}/{order_id}",
                 headers=self.get_auth_headers(),
                 data=modify_data,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -225,9 +226,9 @@ class KiteOrders:
         
         try:
             response = self.session.delete(
-                f"{config.BASE_URL}/orders/{variety}/{order_id}",
+                f"{self.config.base_url}/orders/{variety}/{order_id}",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -255,9 +256,9 @@ class KiteOrders:
         """
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/orders",
+                f"{self.config.base_url}/orders",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -288,9 +289,9 @@ class KiteOrders:
         """
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/orders/{order_id}",
+                f"{self.config.base_url}/orders/{order_id}",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -318,9 +319,9 @@ class KiteOrders:
         """
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/trades",
+                f"{self.config.base_url}/trades",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -351,9 +352,9 @@ class KiteOrders:
         """
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/orders/{order_id}/trades",
+                f"{self.config.base_url}/orders/{order_id}/trades",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -373,9 +374,9 @@ class KiteOrders:
         """Fetch list of GTT triggers."""
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/gtt/triggers",
+                f"{self.config.base_url}/gtt/triggers",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             return response.json().get('data', [])
@@ -386,9 +387,9 @@ class KiteOrders:
         """Fetch specific GTT trigger details."""
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/gtt/triggers/{trigger_id}",
+                f"{self.config.base_url}/gtt/triggers/{trigger_id}",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             return response.json().get('data', {})
@@ -424,10 +425,10 @@ class KiteOrders:
         
         try:
             response = self.session.post(
-                f"{config.BASE_URL}/gtt/triggers",
+                f"{self.config.base_url}/gtt/triggers",
                 headers=self.get_auth_headers(),
                 data=payload,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             return response.json().get('data', {})
@@ -451,10 +452,10 @@ class KiteOrders:
         
         try:
             response = self.session.put(
-                f"{config.BASE_URL}/gtt/triggers/{trigger_id}",
+                f"{self.config.base_url}/gtt/triggers/{trigger_id}",
                 headers=self.get_auth_headers(),
                 data=payload,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             return response.json().get('data', {})
@@ -465,9 +466,9 @@ class KiteOrders:
         """Delete GTT order."""
         try:
             response = self.session.delete(
-                f"{config.BASE_URL}/gtt/triggers/{trigger_id}",
+                f"{self.config.base_url}/gtt/triggers/{trigger_id}",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             return response.json().get('data', {})

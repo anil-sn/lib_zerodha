@@ -19,11 +19,12 @@ class TestKiteOrders:
         return session
     
     @pytest.fixture
-    def orders(self, mock_session):
+    def orders(self, mock_session, test_config):
         """Create KiteOrders instance."""
         return KiteOrders(
             session=mock_session,
-            get_auth_headers=lambda: {"Authorization": "token test_api_key:test_token"}
+            get_auth_headers=lambda: {"Authorization": "token test_api_key:test_token"},
+            config=test_config
         )
     
     def test_place_order_success(self, orders, mock_session):

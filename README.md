@@ -10,6 +10,7 @@ PYTHONPATH=. pytest -x
 PYTHONPATH=. pytest --trace-config
 PYTHONPATH=. pytest --cov=lib_zerodha
 PYTHONPATH=. pytest --cov=lib_zerodha --cov-fail-under=95
+PYTHONPATH=. pytest tests/
 
 ## 🌟 Features
 

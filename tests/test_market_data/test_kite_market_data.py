@@ -24,9 +24,9 @@ class TestKiteMarketData:
         return lambda: {'Authorization': 'token test_api_key:test_token'}
 
     @pytest.fixture
-    def market_data(self, mock_session, mock_get_auth_headers):
+    def market_data(self, mock_session, mock_get_auth_headers, test_config):
         """Create KiteMarketData instance."""
-        return KiteMarketData(mock_session, mock_get_auth_headers)
+        return KiteMarketData(mock_session, mock_get_auth_headers, config=test_config)
 
     def test_get_quote_success(self, market_data, mock_session):
         """Test successful quote retrieval."""

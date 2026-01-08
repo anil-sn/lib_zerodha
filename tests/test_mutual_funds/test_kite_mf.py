@@ -19,11 +19,12 @@ class TestKiteMF:
         return session
     
     @pytest.fixture
-    def mf(self, mock_session):
+    def mf(self, mock_session, test_config):
         """Create KiteMF instance."""
         return KiteMF(
             session=mock_session,
-            get_auth_headers=lambda: {"Authorization": "token test_api_key:test_token"}
+            get_auth_headers=lambda: {"Authorization": "token test_api_key:test_token"},
+            config=test_config
         )
     
     def test_place_order_success(self, mf, mock_session):

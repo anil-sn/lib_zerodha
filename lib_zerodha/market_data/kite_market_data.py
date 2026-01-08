@@ -5,7 +5,6 @@ import requests
 from datetime import datetime, date
 import pandas as pd
 
-from ..config import config
 from ..exceptions import APIError, NetworkError, ValidationError
 from ..models.market_data import Quote, OHLC, DepthItem
 
@@ -13,15 +12,17 @@ from ..models.market_data import Quote, OHLC, DepthItem
 class KiteMarketData:
     """Handles market data, quotes, and historical data."""
     
-    def __init__(self, session: requests.Session, get_auth_headers: callable):
+    def __init__(self, session: requests.Session, get_auth_headers: callable, config: Any):
         """Initialize market data handler.
         
         Args:
             session: Requests session for API calls
             get_auth_headers: Function to get authentication headers
+            config: Configuration object
         """
         self.session = session
         self.get_auth_headers = get_auth_headers
+        self.config = config
     
     def get_quote(self, instruments: Union[str, List[str]]) -> Dict[str, Quote]:
         """Get real-time quotes for instruments.
@@ -51,10 +52,10 @@ class KiteMarketData:
         
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/quote",
+                f"{self.config.base_url}/quote",
                 headers=self.get_auth_headers(),
                 params=params,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -107,10 +108,10 @@ class KiteMarketData:
         
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/quote/ltp",
+                f"{self.config.base_url}/quote/ltp",
                 headers=self.get_auth_headers(),
                 params=params,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -159,10 +160,10 @@ class KiteMarketData:
         
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/quote/ohlc",
+                f"{self.config.base_url}/quote/ohlc",
                 headers=self.get_auth_headers(),
                 params=params,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -240,10 +241,10 @@ class KiteMarketData:
         
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/instruments/historical/{instrument_token}/{interval}",
+                f"{self.config.base_url}/instruments/historical/{instrument_token}/{interval}",
                 headers=self.get_auth_headers(),
                 params=params,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -285,7 +286,7 @@ class KiteMarketData:
             APIError: If API request fails
             NetworkError: If network request fails
         """
-        url = f"{config.BASE_URL}/instruments"
+        url = f"{self.config.base_url}/instruments"
         if exchange:
             url += f"/{exchange}"
         
@@ -293,7 +294,7 @@ class KiteMarketData:
             response = self.session.get(
                 url,
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             

@@ -269,7 +269,8 @@ def mock_kite_client(test_config, tmp_path):
         api_key=test_config.api_key,
         api_secret=test_config.api_secret,
         access_token="valid_access_token",
-        session_file=session_file
+        session_file=session_file,
+        config_obj=test_config
     )
     return client
 

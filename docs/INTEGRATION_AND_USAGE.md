@@ -225,6 +225,25 @@ def on_tick(ticks):
 # ... Setup WebSocket as above ...
 ```
 
+### 4.3 Handling Currency Derivatives (CDS)
+
+Currency Derivatives (CDS) on Kite have a precision of 4 decimal places (division by 10000.0), unlike Equity/NFO which use 2 decimal places (division by 100.0).
+
+To ensure correct prices for CDS instruments, you must explicitly set the precision divisor using `set_precision`.
+
+```python
+# Setup for USDINR (CDS)
+usdinr_token = 123456  # Example token
+
+# Configure precision map BEFORE subscribing
+ws.set_precision(usdinr_token, 10000)
+
+# Subscribe
+ws.subscribe([usdinr_token], mode="full")
+
+# Ticks will now report correct LTP (e.g., 83.4500 instead of 8345.00)
+```
+
 ## 5. F&O / Derivatives
 
 Specialized support for Futures and Options.

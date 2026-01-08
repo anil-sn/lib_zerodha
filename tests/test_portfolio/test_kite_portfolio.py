@@ -12,10 +12,11 @@ class TestKitePortfolio:
         return Mock(spec=requests.Session)
 
     @pytest.fixture
-    def portfolio(self, mock_session):
+    def portfolio(self, mock_session, test_config):
         return KitePortfolio(
             session=mock_session,
-            get_auth_headers=lambda: {"Authorization": "token key:token"}
+            get_auth_headers=lambda: {"Authorization": "token key:token"},
+            config=test_config
         )
 
     def test_get_positions(self, portfolio, mock_session):

@@ -14,7 +14,6 @@ import base64
 
 from .kite_auth import KiteAuth
 from ..exceptions.api_exceptions import AuthenticationError, SessionExpiredError
-from ..config import config
 
 
 class SessionManager:
@@ -24,7 +23,8 @@ class SessionManager:
                  session_file: Optional[str] = None,
                  auto_refresh_callback: Optional[Callable[[], str]] = None,
                  encryption_password: Optional[str] = None,
-                 auth_instance: Optional[KiteAuth] = None):
+                 auth_instance: Optional[KiteAuth] = None,
+                 config: Any = None):
         """Initialize session manager.
         
         Args:
@@ -34,14 +34,16 @@ class SessionManager:
             auto_refresh_callback: Callback to get new request token for auto-refresh
             encryption_password: Password for session encryption (defaults to api_key)
             auth_instance: Existing KiteAuth instance to use
+            config: Configuration object
         """
-        self.auth = auth_instance or KiteAuth(api_key, api_secret)
+        self.config = config
+        self.auth = auth_instance or KiteAuth(api_key, api_secret, config=config)
         self.session_file = session_file or self._default_session_file()
         self.auto_refresh_callback = auto_refresh_callback
         
         # Setup encryption
         self.encryption_password = encryption_password or api_key
-        self._cipher = self._create_cipher()
+        # Cipher is created per operation with unique salt
         
         # Load existing session if available
         self._load_session()
@@ -53,10 +55,9 @@ class SessionManager:
         lib_dir.mkdir(mode=0o700, exist_ok=True)  # Secure directory permissions
         return str(lib_dir / 'session.enc')
     
-    def _create_cipher(self) -> Fernet:
-        """Create encryption cipher from password."""
+    def _create_cipher(self, salt: bytes) -> Fernet:
+        """Create encryption cipher from password and salt."""
         password = self.encryption_password.encode()
-        salt = b'lib_zerodha_salt'  # In production, use random salt per session
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -81,12 +82,20 @@ class SessionManager:
                 fcntl.flock(f.fileno(), fcntl.LOCK_SH)
                 
                 try:
+                    # Read salt (first 16 bytes)
+                    salt = f.read(16)
+                    if len(salt) != 16:
+                        return False
+                        
                     encrypted_data = f.read()
                     if not encrypted_data:
                         return False
                     
+                    # Create cipher with read salt
+                    cipher = self._create_cipher(salt)
+                    
                     # Decrypt session data
-                    decrypted_data = self._cipher.decrypt(encrypted_data)
+                    decrypted_data = cipher.decrypt(encrypted_data)
                     data = json.loads(decrypted_data.decode())
                     
                     # Check session expiry
@@ -94,8 +103,7 @@ class SessionManager:
                     if expiry_str:
                         expiry = datetime.fromisoformat(expiry_str)
                         if datetime.now() > expiry:
-                            # Session expired, but we don't raise here, 
-                            # we let it be handled by higher level or return false
+                            # Session expired
                             return False
                         self.auth.session_expiry = expiry
                     
@@ -130,9 +138,13 @@ class SessionManager:
                 'saved_at': datetime.now().isoformat()
             }
             
+            # Generate new random salt
+            salt = os.urandom(16)
+            cipher = self._create_cipher(salt)
+            
             # Encrypt session data
             json_data = json.dumps(data, indent=2)
-            encrypted_data = self._cipher.encrypt(json_data.encode())
+            encrypted_data = cipher.encrypt(json_data.encode())
             
             # Ensure directory exists
             os.makedirs(os.path.dirname(self.session_file), mode=0o700, exist_ok=True)
@@ -144,6 +156,7 @@ class SessionManager:
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX)
                 
                 try:
+                    f.write(salt) # Write salt first
                     f.write(encrypted_data)
                     f.flush()
                     os.fsync(f.fileno())

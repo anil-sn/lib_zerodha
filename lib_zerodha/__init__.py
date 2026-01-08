@@ -1,5 +1,4 @@
 from .kite_client import KiteClient
-from .config import config
 from .auth import KiteAuth, SessionManager
 from .orders import KiteOrders
 from .market_data import KiteMarketData

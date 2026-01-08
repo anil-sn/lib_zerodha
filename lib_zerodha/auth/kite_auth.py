@@ -6,22 +6,23 @@ from typing import Dict, Optional, Any
 import requests
 from datetime import datetime, timedelta
 
-from ..config import config
 from ..exceptions import AuthenticationError, NetworkError, APIError, SessionExpiredError, InvalidCredentialsError
 
 
 class KiteAuth:
     """Handles Kite Connect authentication and session management."""
     
-    def __init__(self, api_key: str, api_secret: Optional[str] = None):
+    def __init__(self, api_key: str, api_secret: Optional[str] = None, config: Any = None):
         """Initialize authentication handler.
         
         Args:
             api_key: Kite Connect API key
             api_secret: API secret for token generation
+            config: Configuration object
         """
         self.api_key = api_key
         self.api_secret = api_secret
+        self.config = config
         self.access_token: Optional[str] = None
         self.session_expiry: Optional[datetime] = None
         self.user_profile: Optional[Dict[str, Any]] = None
@@ -43,7 +44,7 @@ class KiteAuth:
             'api_key': self.api_key,
             'v': '3'
         }
-        return f"{config.LOGIN_URL}?{urllib.parse.urlencode(params)}"
+        return f"{self.config.LOGIN_URL}?{urllib.parse.urlencode(params)}"
     
     def generate_session(self, request_token: str, api_secret: Optional[str] = None) -> Dict[str, str]:
         """Generate access token from request token.
@@ -76,9 +77,9 @@ class KiteAuth:
         
         try:
             response = self.session.post(
-                f"{config.BASE_URL}/session/token",
+                f"{self.config.base_url}/session/token",
                 data=data,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -134,9 +135,9 @@ class KiteAuth:
         try:
             headers = {'Authorization': f'token {self.api_key}:{self.access_token}'}
             response = self.session.delete(
-                f"{config.BASE_URL}/session/token",
+                f"{self.config.base_url}/session/token",
                 headers=headers,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -303,7 +304,7 @@ class KiteAuth:
         if not self.access_token:
             raise AuthenticationError("Access token required for API requests")
         
-        url = f"{config.API_BASE_URL}{endpoint}"
+        url = f"{self.config.base_url}{endpoint}"
         headers = self.get_auth_headers()
         
         try:

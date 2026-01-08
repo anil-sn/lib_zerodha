@@ -13,7 +13,7 @@ from .portfolio import KitePortfolio
 from .derivatives import KiteFO
 from .mutual_funds.kite_mf import KiteMF
 from .realtime import KiteWebSocket
-from .config import config
+from .config.base_config import Config
 from .exceptions import LibZerodhaError, NetworkError, AuthenticationError
 from .storage import BaseStorage, create_memory_storage
 from .models.market_data import Quote, HistoricalData
@@ -46,14 +46,14 @@ class KiteClient:
         self.api_key = api_key
         self.api_secret = api_secret
         self.request_token = request_token
-        self.config = config_obj or config
+        self.config = config_obj or Config.from_env()
         self.storage = storage or create_memory_storage()
         
         # Setup HTTP session with retries and rate limiting
         self._setup_session()
         
         # Initialize Core components
-        self.auth = KiteAuth(api_key, api_secret)
+        self.auth = KiteAuth(api_key, api_secret, config=self.config)
         self.session_manager = SessionManager(
             api_key, api_secret, 
             auth_instance=self.auth,
@@ -61,11 +61,11 @@ class KiteClient:
         )
         
         # Trading modules - delegate all functionality to these
-        self.orders = KiteOrders(self.session, self._get_auth_headers)
-        self.market_data = KiteMarketData(self.session, self._get_auth_headers)
-        self.portfolio = KitePortfolio(self.session, self._get_auth_headers)
-        self.derivatives = KiteFO(self.session, self._get_auth_headers)
-        self.mf = KiteMF(self.session, self._get_auth_headers)
+        self.orders = KiteOrders(self.session, self._get_auth_headers, config=self.config)
+        self.market_data = KiteMarketData(self.session, self._get_auth_headers, config=self.config)
+        self.portfolio = KitePortfolio(self.session, self._get_auth_headers, config=self.config)
+        self.derivatives = KiteFO(self.session, self._get_auth_headers, config=self.config)
+        self.mf = KiteMF(self.session, self._get_auth_headers, config=self.config)
         
         # Real-time data (initialized when needed)
         self._websocket = None
@@ -225,6 +225,11 @@ class KiteClient:
     def get_margins(self, segment: Optional[str] = None):
         """Get account margins."""
         return self.portfolio.get_margins(segment)
+
+    # Aliases for compatibility
+    def quote(self, *args, **kwargs): return self.get_quote(*args, **kwargs)
+    def ltp(self, *args, **kwargs): return self.get_ltp(*args, **kwargs)
+    def margins(self, *args, **kwargs): return self.get_margins(*args, **kwargs)
 
     def convert_position(self,
                         tradingsymbol: str,

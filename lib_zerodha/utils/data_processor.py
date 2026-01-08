@@ -78,6 +78,7 @@ class DataProcessor:
         
         # Callbacks for candle completion
         self.candle_callbacks: Dict[str, List[Callable]] = defaultdict(list)
+        self.quote_callbacks: List[Callable[[Quote], None]] = []
         
         # Threading lock
         self._lock = threading.RLock()
@@ -143,6 +144,13 @@ class DataProcessor:
         
         self.quote_cache[instrument_token] = quote
         self.cache_timestamps[instrument_token] = timestamp
+        
+        # Trigger quote callbacks
+        for callback in self.quote_callbacks:
+            try:
+                callback(quote)
+            except Exception:
+                pass
     
     def _process_tick_for_interval(self, instrument_token: int, timestamp: datetime,
                                   price: float, volume: int, 
@@ -261,6 +269,10 @@ class DataProcessor:
         """Remove callback for candle completion."""
         if callback in self.candle_callbacks[interval]:
             self.candle_callbacks[interval].remove(callback)
+
+    def add_quote_callback(self, callback: Callable[[Quote], None]) -> None:
+        """Add callback for quote updates."""
+        self.quote_callbacks.append(callback)
     
     def get_stats(self) -> Dict[str, Any]:
         """Get processor statistics."""

@@ -12,10 +12,11 @@ class TestKiteFO:
         return Mock(spec=requests.Session)
 
     @pytest.fixture
-    def fo(self, mock_session):
+    def fo(self, mock_session, test_config):
         return KiteFO(
             session=mock_session,
-            get_auth_headers=lambda: {"Authorization": "token key:token"}
+            get_auth_headers=lambda: {"Authorization": "token key:token"},
+            config=test_config
         )
 
     def test_get_fo_instruments(self, fo, mock_session):

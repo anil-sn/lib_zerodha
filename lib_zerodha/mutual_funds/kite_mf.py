@@ -6,7 +6,6 @@ import json
 import pandas as pd
 from datetime import datetime
 
-from ..config import config
 from ..exceptions import APIError, NetworkError, ValidationError, OrderError
 from ..models.mutual_funds import MFOrder, MFSIP, MFHolding
 
@@ -14,15 +13,17 @@ from ..models.mutual_funds import MFOrder, MFSIP, MFHolding
 class KiteMF:
     """Handles Mutual Fund orders, SIPs, and holdings."""
     
-    def __init__(self, session: requests.Session, get_auth_headers: callable):
+    def __init__(self, session: requests.Session, get_auth_headers: callable, config: Any):
         """Initialize Mutual Funds handler.
         
         Args:
             session: Requests session for API calls
             get_auth_headers: Function to get authentication headers
+            config: Configuration object
         """
         self.session = session
         self.get_auth_headers = get_auth_headers
+        self.config = config
 
     def get_orders(self, order_id: Optional[str] = None) -> Union[List[MFOrder], MFOrder]:
         """Get all MF orders or a specific order.
@@ -34,14 +35,14 @@ class KiteMF:
             List of MFOrder or single MFOrder
         """
         try:
-            url = f"{config.BASE_URL}/mf/orders"
+            url = f"{self.config.base_url}/mf/orders"
             if order_id:
                 url += f"/{order_id}"
                 
             response = self.session.get(
                 url,
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -100,10 +101,10 @@ class KiteMF:
             
         try:
             response = self.session.post(
-                f"{config.BASE_URL}/mf/orders",
+                f"{self.config.base_url}/mf/orders",
                 headers=self.get_auth_headers(),
                 data=payload,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -127,9 +128,9 @@ class KiteMF:
         """
         try:
             response = self.session.delete(
-                f"{config.BASE_URL}/mf/orders/{order_id}",
+                f"{self.config.base_url}/mf/orders/{order_id}",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -152,14 +153,14 @@ class KiteMF:
             List of MFSIP or single MFSIP
         """
         try:
-            url = f"{config.BASE_URL}/mf/sips"
+            url = f"{self.config.base_url}/mf/sips"
             if sip_id:
                 url += f"/{sip_id}"
                 
             response = self.session.get(
                 url,
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -215,10 +216,10 @@ class KiteMF:
             
         try:
             response = self.session.post(
-                f"{config.BASE_URL}/mf/sips",
+                f"{self.config.base_url}/mf/sips",
                 headers=self.get_auth_headers(),
                 data=payload,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -263,10 +264,10 @@ class KiteMF:
             
         try:
             response = self.session.put(
-                f"{config.BASE_URL}/mf/sips/{sip_id}",
+                f"{self.config.base_url}/mf/sips/{sip_id}",
                 headers=self.get_auth_headers(),
                 data=payload,
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -290,9 +291,9 @@ class KiteMF:
         """
         try:
             response = self.session.delete(
-                f"{config.BASE_URL}/mf/sips/{sip_id}",
+                f"{self.config.base_url}/mf/sips/{sip_id}",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -313,9 +314,9 @@ class KiteMF:
         """
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/mf/holdings",
+                f"{self.config.base_url}/mf/holdings",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
@@ -337,9 +338,9 @@ class KiteMF:
         """
         try:
             response = self.session.get(
-                f"{config.BASE_URL}/mf/instruments",
+                f"{self.config.base_url}/mf/instruments",
                 headers=self.get_auth_headers(),
-                timeout=config.TIMEOUT
+                timeout=self.config.timeout
             )
             response.raise_for_status()
             
