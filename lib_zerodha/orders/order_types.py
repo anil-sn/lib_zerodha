@@ -29,6 +29,7 @@ class ProductType(Enum):
     CNC = "CNC"  # Cash and Carry
     MIS = "MIS"  # Margin Intraday Square-off
     NRML = "NRML"  # Normal
+    MTF = "MTF"  # Margin Trade Funding
     
     def __str__(self):
         return self.value
@@ -93,30 +94,10 @@ class InstrumentType(Enum):
         return self.value
 
 
-# Order parameter constraints
-ORDER_CONSTRAINTS = {
-    'quantity': {
-        'min': 1,
-        'max': 1000000
-    },
-    'price': {
-        'min': 0.01,
-        'max': 1000000.0
-    },
-    'trigger_price': {
-        'min': 0.01,
-        'max': 1000000.0
-    },
-    'disclosed_quantity': {
-        'min': 1,
-        'max': 1000000
-    }
-}
-
 # Valid combinations of order types and products
 VALID_COMBINATIONS = {
-    OrderType.MARKET: [ProductType.CNC, ProductType.MIS, ProductType.NRML],
-    OrderType.LIMIT: [ProductType.CNC, ProductType.MIS, ProductType.NRML],
+    OrderType.MARKET: [ProductType.CNC, ProductType.MIS, ProductType.NRML, ProductType.MTF],
+    OrderType.LIMIT: [ProductType.CNC, ProductType.MIS, ProductType.NRML, ProductType.MTF],
     OrderType.SL: [ProductType.MIS, ProductType.NRML],
     OrderType.SL_M: [ProductType.MIS, ProductType.NRML]
 }

@@ -154,9 +154,15 @@ class KiteClient:
 
     # --- Orders Delegate Methods ---
 
-    def place_order(self, variety: str = "regular", **kwargs) -> str:
+    def place_order(self, variety: str = "regular", 
+                   iceberg_legs: Optional[int] = None, 
+                   iceberg_quantity: Optional[int] = None, 
+                   **kwargs) -> str:
         """Place a new order."""
-        return self.orders.place_order(variety=variety, **kwargs)
+        return self.orders.place_order(variety=variety, 
+                                     iceberg_legs=iceberg_legs, 
+                                     iceberg_quantity=iceberg_quantity, 
+                                     **kwargs)
 
     def modify_order(self, order_id: str, variety: str = "regular", **kwargs) -> str:
         """Modify an existing order."""

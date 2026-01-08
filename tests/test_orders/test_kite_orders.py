@@ -48,8 +48,88 @@ class TestKiteOrders:
         assert order_id == "240107000001"
         mock_session.post.assert_called_once()
     
+    def test_place_iceberg_order(self, orders, mock_session):
+        """Test successful Iceberg order placement."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "success",
+            "data": {"order_id": "240107000002"}
+        }
+        mock_session.post.return_value = mock_response
+        
+        order_id = orders.place_order(
+            tradingsymbol="INFY",
+            exchange="NSE",
+            transaction_type="BUY",
+            quantity=100,
+            order_type="MARKET",
+            product="CNC",
+            iceberg_legs=5,
+            iceberg_quantity=20
+        )
+        
+        assert order_id == "240107000002"
+        mock_session.post.assert_called_once()
+        
+        # Verify payload contains iceberg params
+        call_args = mock_session.post.call_args
+        data = call_args[1]['data']
+        assert data['iceberg_legs'] == 5
+        assert data['iceberg_quantity'] == 20
+
+    def test_place_mtf_order(self, orders, mock_session):
+        """Test successful MTF order placement."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "success",
+            "data": {"order_id": "240107000003"}
+        }
+        mock_session.post.return_value = mock_response
+        
+        order_id = orders.place_order(
+            tradingsymbol="INFY",
+            exchange="NSE",
+            transaction_type="BUY",
+            quantity=1,
+            order_type="MARKET",
+            product="MTF"
+        )
+        
+        assert order_id == "240107000003"
+        mock_session.post.assert_called_once()
+        
+        # Verify payload contains MTF product
+        call_args = mock_session.post.call_args
+        data = call_args[1]['data']
+        assert data['product'] == 'MTF'
+
+    def test_place_order_large_quantity(self, orders, mock_session):
+        """Test order placement with large quantity (constraints removed)."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "success",
+            "data": {"order_id": "240107000004"}
+        }
+        mock_session.post.return_value = mock_response
+        
+        # Should not raise ValidationError despite being > 1,000,000 (old limit)
+        order_id = orders.place_order(
+            tradingsymbol="INFY",
+            exchange="NSE",
+            transaction_type="BUY",
+            quantity=2000000,
+            order_type="MARKET",
+            product="CNC"
+        )
+        
+        assert order_id == "240107000004"
+        mock_session.post.assert_called_once()
+
     def test_place_order_validation_error(self, orders):
-        """Test order validation failure."""
+        """Test order validation failure (invalid exchange)."""
         with pytest.raises(ValidationError):
             orders.place_order(
                 tradingsymbol="INFY",

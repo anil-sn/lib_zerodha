@@ -71,12 +71,18 @@ class KiteWebSocket:
             self._handle_error(f"Tick processing failed: {e}")
 
     def _parse_binary(self, data: bytes) -> List[Tick]:
-        ticks = []
-        offset = 0
+        """Parse binary frame from WebSocket."""
+        # Packet header: 2 bytes (number of packets)
+        if len(data) < 2: return []
         
-        while offset < len(data):
+        num_packets = struct.unpack(">H", data[0:2])[0]
+        ticks = []
+        offset = 2
+        
+        for _ in range(num_packets):
             if offset + 2 > len(data): break
             
+            # Packet length: 2 bytes
             packet_len = struct.unpack(">H", data[offset:offset+2])[0]
             offset += 2
             
@@ -91,24 +97,123 @@ class KiteWebSocket:
             
         return ticks
 
+    def _get_precision(self, token: int) -> int:
+        """Get precision divisor for instrument."""
+        # CDS segment instruments typically have tokens in specific ranges or use 4 decimal places.
+        # Without segment info in the tick, we rely on range heuristics or configuration.
+        # For now, default to 100 (2 decimals) as per standard equity/NFO.
+        # TODO: Allow user to inject precision map.
+        return 100
+
     def _parse_packet(self, data: bytes) -> Optional[Tick]:
         if len(data) < 4: return None
         
         token = struct.unpack(">I", data[0:4])[0]
         mode = self._subscriptions.get(token, self.MODE_LTP)
+        divisor = self._get_precision(token)
         
         try:
             if mode == self.MODE_LTP and len(data) >= 8:
-                lp = struct.unpack(">I", data[4:8])[0] / 100.0
-                return Tick.from_dict({'instrument_token': token, 'last_price': lp})
+                lp = struct.unpack(">I", data[4:8])[0] / divisor
+                return Tick.from_dict({'instrument_token': token, 'last_price': lp, 'mode': self.MODE_LTP})
             
             elif mode == self.MODE_QUOTE and len(data) >= 44:
-                # Basic quote parsing
-                lp = struct.unpack(">I", data[4:8])[0] / 100.0
-                vol = struct.unpack(">I", data[16:20])[0]
-                return Tick.from_dict({'instrument_token': token, 'last_price': lp, 'volume': vol})
+                lp = struct.unpack(">I", data[4:8])[0] / divisor
+                last_traded_quantity = struct.unpack(">I", data[8:12])[0]
+                avg_traded_price = struct.unpack(">I", data[12:16])[0] / divisor
+                volume = struct.unpack(">I", data[16:20])[0]
+                buy_quantity = struct.unpack(">I", data[20:24])[0]
+                sell_quantity = struct.unpack(">I", data[24:28])[0]
+                ohlc = {
+                    'open': struct.unpack(">I", data[28:32])[0] / divisor,
+                    'high': struct.unpack(">I", data[32:36])[0] / divisor,
+                    'low': struct.unpack(">I", data[36:40])[0] / divisor,
+                    'close': struct.unpack(">I", data[40:44])[0] / divisor
+                }
+                return Tick.from_dict({
+                    'instrument_token': token, 
+                    'last_price': lp, 
+                    'last_traded_quantity': last_traded_quantity,
+                    'average_traded_price': avg_traded_price,
+                    'volume': volume,
+                    'buy_quantity': buy_quantity,
+                    'sell_quantity': sell_quantity,
+                    'ohlc': ohlc,
+                    'mode': self.MODE_QUOTE
+                })
                 
-            # Full mode parsing can be expanded here
+            elif mode == self.MODE_FULL and len(data) >= 184:
+                # Basic parsing for full mode (skipping depth for brevity but structure is there)
+                # 0-4: Token
+                # 4-8: LTP
+                # 8-12: Last Traded Quantity
+                # 12-16: Avg Traded Price
+                # 16-20: Volume
+                # 20-24: Buy Quantity
+                # 24-28: Sell Quantity
+                # 28-32: Open
+                # 32-36: High
+                # 36-40: Low
+                # 40-44: Close
+                # 44-48: Last Traded Timestamp
+                # 48-52: OI
+                # 52-56: OI High
+                # 56-60: OI Low
+                # 60-64: Exchange Timestamp
+                # 64-184: Market Depth (Order Book)
+                
+                lp = struct.unpack(">I", data[4:8])[0] / divisor
+                last_traded_quantity = struct.unpack(">I", data[8:12])[0]
+                avg_traded_price = struct.unpack(">I", data[12:16])[0] / divisor
+                volume = struct.unpack(">I", data[16:20])[0]
+                buy_quantity = struct.unpack(">I", data[20:24])[0]
+                sell_quantity = struct.unpack(">I", data[24:28])[0]
+                ohlc = {
+                    'open': struct.unpack(">I", data[28:32])[0] / divisor,
+                    'high': struct.unpack(">I", data[32:36])[0] / divisor,
+                    'low': struct.unpack(">I", data[36:40])[0] / divisor,
+                    'close': struct.unpack(">I", data[40:44])[0] / divisor
+                }
+                last_trade_time = struct.unpack(">I", data[44:48])[0]
+                oi = struct.unpack(">I", data[48:52])[0]
+                oi_high = struct.unpack(">I", data[52:56])[0]
+                oi_low = struct.unpack(">I", data[56:60])[0]
+                exchange_timestamp = struct.unpack(">I", data[60:64])[0]
+                
+                # Market Depth (5 Buy + 5 Sell) * 12 bytes = 120 bytes
+                # Starting at offset 64
+                depth = {'buy': [], 'sell': []}
+                depth_offset = 64
+                
+                for _ in range(5):
+                    q = struct.unpack(">I", data[depth_offset:depth_offset+4])[0]
+                    p = struct.unpack(">I", data[depth_offset+4:depth_offset+8])[0] / divisor
+                    o = struct.unpack(">H", data[depth_offset+8:depth_offset+10])[0]
+                    depth['buy'].append({'quantity': q, 'price': p, 'orders': o})
+                    depth_offset += 12
+                    
+                for _ in range(5):
+                    q = struct.unpack(">I", data[depth_offset:depth_offset+4])[0]
+                    p = struct.unpack(">I", data[depth_offset+4:depth_offset+8])[0] / divisor
+                    o = struct.unpack(">H", data[depth_offset+8:depth_offset+10])[0]
+                    depth['sell'].append({'quantity': q, 'price': p, 'orders': o})
+                    depth_offset += 12
+                
+                return Tick.from_dict({
+                    'instrument_token': token, 
+                    'last_price': lp, 
+                    'last_traded_quantity': last_traded_quantity,
+                    'average_traded_price': avg_traded_price,
+                    'volume': volume,
+                    'buy_quantity': buy_quantity,
+                    'sell_quantity': sell_quantity,
+                    'ohlc': ohlc,
+                    'oi': oi,
+                    'oi_day_high': oi_high,
+                    'oi_day_low': oi_low,
+                    'depth': depth,
+                    'mode': self.MODE_FULL
+                })
             
         except Exception as e:
             logger.debug(f"Parsing failed for {token}: {e}")
@@ -162,10 +267,19 @@ class KiteWebSocket:
         
         # Resubscribe to existing tokens if any
         with self._lock:
+            # Group tokens by mode
+            mode_map = {}
             for token, mode in self._subscriptions.items():
-                # We need to send subscribe for each mode group or just resubscribe all
-                # This is a simplified resubscribe
-                pass # Logic to resubscribe would go here
+                if mode not in mode_map:
+                    mode_map[mode] = []
+                mode_map[mode].append(token)
+            
+            # Subscribe and set mode
+            for mode, tokens in mode_map.items():
+                if tokens:
+                    self._ws.send(json.dumps({"a": "subscribe", "v": tokens}))
+                    if mode != self.MODE_LTP:
+                        self._ws.send(json.dumps({"a": "mode", "v": tokens, "m": mode}))
 
         for handler in self._on_connect_handlers:
             try:

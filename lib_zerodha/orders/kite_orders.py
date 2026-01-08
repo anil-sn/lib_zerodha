@@ -37,7 +37,9 @@ class KiteOrders:
                    disclosed_quantity: Optional[int] = None,
                    validity: str = "DAY",
                    variety: Union[str, Variety] = Variety.REGULAR,
-                   tag: Optional[str] = None) -> str:
+                   tag: Optional[str] = None,
+                   iceberg_legs: Optional[int] = None,
+                   iceberg_quantity: Optional[int] = None) -> str:
         """Place a new order.
         
         Args:
@@ -53,6 +55,8 @@ class KiteOrders:
             validity: Order validity (DAY, IOC)
             variety: Order variety (regular, amo, co, iceberg)
             tag: Optional tag for order identification
+            iceberg_legs: Number of legs for Iceberg order
+            iceberg_quantity: Quantity per leg for Iceberg order
             
         Returns:
             Order ID
@@ -77,7 +81,8 @@ class KiteOrders:
             order_type=order_type,
             product=product,
             price=price,
-            trigger_price=trigger_price
+            trigger_price=trigger_price,
+            disclosed_quantity=disclosed_quantity
         )
         
         # Prepare order data
@@ -100,6 +105,10 @@ class KiteOrders:
             order_data['disclosed_quantity'] = disclosed_quantity
         if tag:
             order_data['tag'] = tag
+        if iceberg_legs is not None:
+            order_data['iceberg_legs'] = iceberg_legs
+        if iceberg_quantity is not None:
+            order_data['iceberg_quantity'] = iceberg_quantity
         
         try:
             response = self.session.post(

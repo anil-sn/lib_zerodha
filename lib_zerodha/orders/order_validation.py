@@ -6,7 +6,7 @@ from typing import Optional, Union
 from ..exceptions import ValidationError
 from .order_types import (
     OrderType, ProductType, TransactionType, Exchange, Validity,
-    ORDER_CONSTRAINTS, VALID_COMBINATIONS
+    VALID_COMBINATIONS
 )
 
 
@@ -157,12 +157,9 @@ class OrderValidator:
         """
         if not isinstance(quantity, int):
             raise ValidationError("Quantity must be an integer")
-        
-        constraints = ORDER_CONSTRAINTS['quantity']
-        if quantity < constraints['min'] or quantity > constraints['max']:
-            raise ValidationError(
-                f"Quantity must be between {constraints['min']} and {constraints['max']}"
-            )
+            
+        if quantity <= 0:
+            raise ValidationError("Quantity must be greater than 0")
         
         return True
     
@@ -260,28 +257,11 @@ class OrderValidator:
         if order_type == 'MARKET' and price is not None:
             raise ValidationError("MARKET orders should not specify price")
         
-        # Validate price range
-        if price is not None:
-            constraints = ORDER_CONSTRAINTS['price']
-            if price <= constraints['min'] or price > constraints['max']:
-                raise ValidationError(
-                    f"Price must be between {constraints['min']} and {constraints['max']}"
-                )
-        
-        # Validate trigger price range
-        if trigger_price is not None:
-            constraints = ORDER_CONSTRAINTS['trigger_price']
-            if trigger_price <= constraints['min'] or trigger_price > constraints['max']:
-                raise ValidationError(
-                    f"Trigger price must be between {constraints['min']} and {constraints['max']}"
-                )
-        
-        # SL order price validation
-        if order_type == 'SL' and price is not None and trigger_price is not None:
-            # For SL-BUY: price >= trigger_price
-            # For SL-SELL: price <= trigger_price  
-            # We can't validate this here as we don't have transaction_type
-            pass
+        if price is not None and price <= 0:
+            raise ValidationError("Price must be greater than 0")
+            
+        if trigger_price is not None and trigger_price <= 0:
+            raise ValidationError("Trigger price must be greater than 0")
         
         return True
     
@@ -300,12 +280,9 @@ class OrderValidator:
         """
         if not isinstance(disclosed_quantity, int):
             raise ValidationError("Disclosed quantity must be an integer")
-        
-        constraints = ORDER_CONSTRAINTS['disclosed_quantity']
-        if disclosed_quantity < constraints['min'] or disclosed_quantity > constraints['max']:
-            raise ValidationError(
-                f"Disclosed quantity must be between {constraints['min']} and {constraints['max']}"
-            )
+            
+        if disclosed_quantity <= 0:
+            raise ValidationError("Disclosed quantity must be greater than 0")
         
         if disclosed_quantity > total_quantity:
             raise ValidationError("Disclosed quantity cannot exceed total quantity")
