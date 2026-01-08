@@ -38,6 +38,7 @@ dependencies = [
     "websocket-client>=1.4.0", 
     "pandas>=1.5.0",
     "numpy>=1.21.0",
+    "cryptography>=3.4.0",
 ]
 
 [project.optional-dependencies]

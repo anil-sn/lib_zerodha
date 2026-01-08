@@ -160,6 +160,43 @@ class KitePortfolio:
         except requests.exceptions.RequestException as e:
             raise NetworkError(f"Network error during position conversion: {str(e)}")
     
+    def get_margins(self, segment: Optional[str] = None) -> Dict[str, Any]:
+        """Get account margins.
+        
+        Args:
+            segment: Optional segment (equity or commodity)
+            
+        Returns:
+            Dictionary with margin details
+            
+        Raises:
+            APIError: If API request fails
+            NetworkError: If network request fails
+        """
+        url = f"{config.BASE_URL}/user/margins"
+        if segment:
+            url += f"/{segment}"
+            
+        try:
+            response = self.session.get(
+                url,
+                headers=self.get_auth_headers(),
+                timeout=config.TIMEOUT
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            if result.get('status') == 'error':
+                raise APIError(
+                    result.get('message', 'Failed to fetch margins'),
+                    result.get('error_type')
+                )
+                
+            return result.get('data', {})
+            
+        except requests.exceptions.RequestException as e:
+            raise NetworkError(f"Network error while fetching margins: {str(e)}")
+
     def get_portfolio_summary(self) -> Portfolio:
         """Get comprehensive portfolio summary.
         

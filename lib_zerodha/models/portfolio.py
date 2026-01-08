@@ -40,6 +40,17 @@ class Position:
     day_sell_price: float
     day_sell_value: float
     
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Position':
+        """Create Position from API response with resilient parsing."""
+        from dataclasses import fields
+        
+        # Filter known fields to handle future API additions gracefully
+        known_fields = {f.name for f in fields(cls)}
+        filtered_data = {k: v for k, v in data.items() if k in known_fields}
+        
+        return cls(**filtered_data)
+    
     @property
     def net_quantity(self) -> int:
         """Calculate net position quantity."""
@@ -92,10 +103,40 @@ class Holding:
     day_change: float = 0.0
     day_change_percentage: float = 0.0
     
+    # Missing field from ISSUES_REPORT.md
+    used_quantity: int = 0
+    price: float = 0.0  # Additional field from API
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Holding':
+        """Create Holding from API response with resilient parsing."""
+        from dataclasses import fields
+        from datetime import datetime
+        
+        # Parse authorised_date safely
+        authorised_date = data.get('authorised_date')
+        if isinstance(authorised_date, str):
+            try:
+                authorised_date = datetime.fromisoformat(authorised_date.replace(' ', 'T'))
+            except ValueError:
+                authorised_date = None
+        
+        # Filter known fields to handle future API additions gracefully
+        known_fields = {f.name for f in fields(cls)}
+        filtered_data = {k: v for k, v in data.items() if k in known_fields}
+        
+        # Override with processed data
+        filtered_data['authorised_date'] = authorised_date
+        
+        return cls(**filtered_data)
+    
     def __post_init__(self):
         """Post-initialization processing."""
         if isinstance(self.authorised_date, str):
-            self.authorised_date = datetime.fromisoformat(self.authorised_date)
+            try:
+                self.authorised_date = datetime.fromisoformat(self.authorised_date.replace(' ', 'T'))
+            except ValueError:
+                self.authorised_date = None
     
     @property
     def market_value(self) -> float:

@@ -1,0 +1,27 @@
+{
+  "general": {
+    "previewfeatures": true,
+    "sessionretention": { "enabled": true },
+    "enablepromptcompletion": true,
+    "model": "gemini-3-pro",
+    "temperature": 1.0
+  },
+  "python_specific": {
+    "interface_focus": "cli_tui",
+    "tui_framework_preference": "textual",
+    "type_hinting": "strictly_enforced",
+    "pydantic_v3_integration": true,
+    "docstring_style": "google"
+  },
+  "output": {
+    "format": "markdown",
+    "include_error_handling_logic": "comprehensive",
+    "cli_ux_best_practices": true
+  },
+  "terminal": {
+    "showstatusintitle": true,
+    "showmemoryusage": true,
+    "syntax_highlighting": "monokai_pro",
+    "enable_interactive_shell_execution": true
+  }
+}

@@ -112,7 +112,12 @@ class KiteAuth:
             }
             
         except requests.exceptions.RequestException as e:
-            raise NetworkError(f"Network error during token generation: {str(e)}")
+            # Parse Kite API error response if available
+            error_details = self._parse_api_error_response(e.response if hasattr(e, 'response') else None)
+            raise NetworkError(
+                f"Network error during token generation: {error_details or str(e)}",
+                context={'original_error': str(e), 'error_type': type(e).__name__}
+            ) from e
     
     def invalidate_session(self) -> bool:
         """Invalidate current session.
@@ -143,7 +148,12 @@ class KiteAuth:
             return True
             
         except requests.exceptions.RequestException as e:
-            raise AuthenticationError(f"Failed to invalidate session: {str(e)}")
+            # Parse API error response for better error details
+            error_details = self._parse_api_error_response(e.response if hasattr(e, 'response') else None)
+            raise AuthenticationError(
+                f"Failed to invalidate session: {error_details or str(e)}",
+                context={'status_code': getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None}
+            ) from e
     
     def is_session_valid(self) -> bool:
         """Check if current session is valid.
@@ -329,8 +339,45 @@ class KiteAuth:
             return data
             
         except requests.exceptions.RequestException as e:
-            raise NetworkError(f"Network request failed: {str(e)}")
+            raise NetworkError(f"Network request failed: {str(e)}") from e
         except Exception as e:
             if isinstance(e, (AuthenticationError, NetworkError, APIError, SessionExpiredError, InvalidCredentialsError)):
                 raise
-            raise APIError(f"Request failed: {str(e)}")
+            raise APIError(f"Request failed: {str(e)}") from e
+    
+    def _parse_api_error_response(self, response) -> Optional[str]:
+        """Parse Kite API error response to extract detailed error information.
+        
+        Args:
+            response: HTTP response object
+            
+        Returns:
+            Detailed error message or None if parsing fails
+        """
+        if not response:
+            return None
+        
+        try:
+            # Check if response has JSON content
+            if response.headers.get('content-type', '').startswith('application/json'):
+                error_data = response.json()
+                
+                # Extract Kite API error details
+                if error_data.get('status') == 'error':
+                    error_type = error_data.get('error_type', 'UnknownError')
+                    message = error_data.get('message', 'No error message provided')
+                    
+                    # Include additional context if available
+                    context_parts = [f"{error_type}: {message}"]
+                    
+                    if 'data' in error_data and error_data['data']:
+                        context_parts.append(f"Details: {error_data['data']}")
+                    
+                    return " | ".join(context_parts)
+            
+            # Fallback to status code and reason
+            return f"HTTP {response.status_code}: {response.reason}"
+            
+        except Exception:
+            # If parsing fails, return basic info
+            return f"HTTP {getattr(response, 'status_code', 'Unknown')} Error"

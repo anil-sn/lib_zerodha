@@ -41,9 +41,18 @@ class Quote:
     # OHLC data
     ohlc: OHLC
     
-    # Volume data
+    # Volume and trade data
     volume: int = 0
     average_price: float = 0.0
+    last_quantity: int = 0
+    buy_quantity: int = 0
+    sell_quantity: int = 0
+    
+    # Missing fields from ISSUES_REPORT.md
+    last_trade_time: Optional[datetime] = None
+    net_change: float = 0.0
+    lower_circuit_limit: float = 0.0
+    upper_circuit_limit: float = 0.0
     
     # Market depth
     depth: Dict[str, List[DepthItem]] = field(default_factory=lambda: {"buy": [], "sell": []})
@@ -52,6 +61,66 @@ class Quote:
     oi: int = 0  # Open Interest
     oi_day_high: int = 0
     oi_day_low: int = 0
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Quote':
+        """Create Quote from API response with resilient parsing."""
+        from dataclasses import fields
+        from datetime import datetime
+        
+        # Handle OHLC data
+        ohlc_data = data.get('ohlc', {})
+        ohlc = OHLC(
+            open=ohlc_data.get('open', 0.0),
+            high=ohlc_data.get('high', 0.0),
+            low=ohlc_data.get('low', 0.0),
+            close=ohlc_data.get('close', 0.0),
+            volume=data.get('volume', 0)
+        )
+        
+        # Handle depth data
+        depth_data = data.get('depth', {"buy": [], "sell": []})
+        depth = {"buy": [], "sell": []}
+        
+        for side in ['buy', 'sell']:
+            for item in depth_data.get(side, []):
+                if isinstance(item, dict):
+                    depth[side].append(DepthItem(
+                        price=item.get('price', 0.0),
+                        quantity=item.get('quantity', 0),
+                        orders=item.get('orders', 0)
+                    ))
+        
+        # Parse timestamps safely
+        timestamp = data.get('timestamp')
+        if isinstance(timestamp, str):
+            try:
+                timestamp = datetime.fromisoformat(timestamp.replace(' ', 'T'))
+            except ValueError:
+                timestamp = datetime.now()
+        elif not isinstance(timestamp, datetime):
+            timestamp = datetime.now()
+            
+        last_trade_time = data.get('last_trade_time')
+        if isinstance(last_trade_time, str):
+            try:
+                last_trade_time = datetime.fromisoformat(last_trade_time.replace(' ', 'T'))
+            except ValueError:
+                last_trade_time = None
+        
+        # Filter known fields to handle future API additions gracefully
+        known_fields = {f.name for f in fields(cls) if f.name not in ['ohlc', 'depth']}
+        filtered_data = {k: v for k, v in data.items() if k in known_fields}
+        
+        # Override with processed data
+        filtered_data.update({
+            'ohlc': ohlc,
+            'depth': depth,
+            'timestamp': timestamp,
+            'last_trade_time': last_trade_time
+        })
+        
+        return cls(**filtered_data)
     
     def to_pandas_row(self) -> Dict[str, Any]:
         """Convert to pandas-compatible row."""
@@ -147,6 +216,61 @@ class Order:
     validity: str
     tag: Optional[str]
     
+    # Missing fields from ISSUES_REPORT.md
+    status_message_raw: Optional[str] = None
+    modified: bool = False
+    market_protection: int = 0
+    meta: Dict[str, Any] = field(default_factory=dict)
+    validity_ttl: Optional[int] = None
+    tags: List[str] = field(default_factory=list)  # Changed from single tag to array
+    guid: Optional[str] = None
+    placed_by: Optional[str] = None
+    exchange_order_id: Optional[str] = None
+    exchange_update_timestamp: Optional[datetime] = None
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Order':
+        """Create Order from API response with resilient parsing."""
+        from dataclasses import fields
+        from datetime import datetime
+        
+        # Parse timestamps safely
+        def parse_dt(val):
+            if isinstance(val, str) and val:
+                try:
+                    return datetime.fromisoformat(val.replace(' ', 'T'))
+                except ValueError:
+                    return None
+            return val if isinstance(val, datetime) else None
+
+        order_timestamp = parse_dt(data.get('order_timestamp')) or datetime.now()
+        exchange_timestamp = parse_dt(data.get('exchange_timestamp'))
+        exchange_update_timestamp = parse_dt(data.get('exchange_update_timestamp'))
+        
+        # Handle tags - could be single tag or array
+        tags = []
+        if 'tag' in data and data['tag'] is not None:
+            tags.append(str(data['tag']))
+        if 'tags' in data:
+            if isinstance(data['tags'], list):
+                tags.extend([str(t) for t in data['tags']])
+            elif data['tags'] is not None:
+                tags.append(str(data['tags']))
+        
+        # Filter known fields to handle future API additions gracefully
+        known_fields = {f.name for f in fields(cls)}
+        filtered_data = {k: v for k, v in data.items() if k in known_fields}
+        
+        # Override with processed data
+        filtered_data.update({
+            'order_timestamp': order_timestamp,
+            'exchange_timestamp': exchange_timestamp,
+            'exchange_update_timestamp': exchange_update_timestamp,
+            'tags': tags
+        })
+        
+        return cls(**filtered_data)
+    
     @property
     def is_complete(self) -> bool:
         return self.status == "COMPLETE"
@@ -193,6 +317,34 @@ class Holding:
     pnl: float
     day_change: float
     day_change_percentage: float
+    
+    # Missing field from ISSUES_REPORT.md
+    used_quantity: int = 0
+    price: float = 0.0  # Additional field from API
+    short_quantity: int = 0
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Holding':
+        """Create Holding from API response with resilient parsing."""
+        from dataclasses import fields
+        from datetime import datetime
+        
+        # Parse authorised_date safely
+        authorised_date = data.get('authorised_date')
+        if isinstance(authorised_date, str):
+            try:
+                authorised_date = datetime.fromisoformat(authorised_date.replace(' ', 'T'))
+            except ValueError:
+                authorised_date = None
+        
+        # Filter known fields to handle future API additions gracefully
+        known_fields = {f.name for f in fields(cls)}
+        filtered_data = {k: v for k, v in data.items() if k in known_fields}
+        
+        # Override with processed data
+        filtered_data['authorised_date'] = authorised_date
+        
+        return cls(**filtered_data)
 
 @dataclass
 class MarginInfo:

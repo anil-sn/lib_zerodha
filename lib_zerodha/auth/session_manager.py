@@ -1,22 +1,30 @@
-"""Advanced session management with auto-renewal and persistence."""
+"""Advanced session management with encryption and security."""
 
 import json
 import os
+import fcntl
+import stat
 from typing import Dict, Optional, Callable, Any
 from datetime import datetime, timedelta
 from pathlib import Path
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import base64
 
 from .kite_auth import KiteAuth
-from ..exceptions import AuthenticationError
+from ..exceptions.api_exceptions import AuthenticationError, SessionExpiredError
 from ..config import config
 
 
 class SessionManager:
-    """Advanced session manager with persistence and auto-renewal."""
+    """Secure session manager with encryption and file locking."""
     
     def __init__(self, api_key: str, api_secret: Optional[str] = None,
                  session_file: Optional[str] = None,
-                 auto_refresh_callback: Optional[Callable[[], str]] = None):
+                 auto_refresh_callback: Optional[Callable[[], str]] = None,
+                 encryption_password: Optional[str] = None,
+                 auth_instance: Optional[KiteAuth] = None):
         """Initialize session manager.
         
         Args:
@@ -24,75 +32,137 @@ class SessionManager:
             api_secret: API secret for token generation
             session_file: File path to persist session data
             auto_refresh_callback: Callback to get new request token for auto-refresh
+            encryption_password: Password for session encryption (defaults to api_key)
+            auth_instance: Existing KiteAuth instance to use
         """
-        self.auth = KiteAuth(api_key, api_secret)
+        self.auth = auth_instance or KiteAuth(api_key, api_secret)
         self.session_file = session_file or self._default_session_file()
         self.auto_refresh_callback = auto_refresh_callback
+        
+        # Setup encryption
+        self.encryption_password = encryption_password or api_key
+        self._cipher = self._create_cipher()
         
         # Load existing session if available
         self._load_session()
     
     def _default_session_file(self) -> str:
-        """Get default session file path."""
+        """Get default session file path with secure permissions."""
         home = Path.home()
         lib_dir = home / '.lib_zerodha'
-        lib_dir.mkdir(exist_ok=True)
-        return str(lib_dir / 'session.json')
+        lib_dir.mkdir(mode=0o700, exist_ok=True)  # Secure directory permissions
+        return str(lib_dir / 'session.enc')
+    
+    def _create_cipher(self) -> Fernet:
+        """Create encryption cipher from password."""
+        password = self.encryption_password.encode()
+        salt = b'lib_zerodha_salt'  # In production, use random salt per session
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(password))
+        return Fernet(key)
     
     def _load_session(self) -> bool:
-        """Load session from file.
+        """Load and decrypt session from file with file locking.
         
         Returns:
             True if session loaded successfully
         """
-        try:
-            if os.path.exists(self.session_file):
-                with open(self.session_file, 'r') as f:
-                    data = json.load(f)
-                
-                # Restore session data
-                self.auth.access_token = data.get('access_token')
-                self.auth.user_profile = data.get('user_profile')
-                
-                expiry_str = data.get('session_expiry')
-                if expiry_str:
-                    self.auth.session_expiry = datetime.fromisoformat(expiry_str)
-                
-                return True
-        except Exception:
-            pass  # Ignore errors, will create new session
+        if not os.path.exists(self.session_file):
+            return False
         
-        return False
+        try:
+            with open(self.session_file, 'rb') as f:
+                # Acquire shared lock for reading
+                fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+                
+                try:
+                    encrypted_data = f.read()
+                    if not encrypted_data:
+                        return False
+                    
+                    # Decrypt session data
+                    decrypted_data = self._cipher.decrypt(encrypted_data)
+                    data = json.loads(decrypted_data.decode())
+                    
+                    # Check session expiry
+                    expiry_str = data.get('session_expiry')
+                    if expiry_str:
+                        expiry = datetime.fromisoformat(expiry_str)
+                        if datetime.now() > expiry:
+                            # Session expired, but we don't raise here, 
+                            # we let it be handled by higher level or return false
+                            return False
+                        self.auth.session_expiry = expiry
+                    
+                    # Restore session data
+                    self.auth.access_token = data.get('access_token')
+                    self.auth.user_profile = data.get('user_profile')
+                    
+                    return True
+                    
+                finally:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    
+        except Exception:
+            # Clear invalid session file if corrupted
+            return False
     
     def _save_session(self) -> bool:
-        """Save session to file.
+        """Save and encrypt session to file with file locking.
         
         Returns:
             True if session saved successfully
         """
-        try:
-            if self.auth.access_token:
-                data = {
-                    'access_token': self.auth.access_token,
-                    'user_profile': self.auth.user_profile,
-                    'session_expiry': self.auth.session_expiry.isoformat() if self.auth.session_expiry else None,
-                    'saved_at': datetime.now().isoformat()
-                }
-                
-                # Ensure directory exists
-                os.makedirs(os.path.dirname(self.session_file), exist_ok=True)
-                
-                with open(self.session_file, 'w') as f:
-                    json.dump(data, f, indent=2)
-                
-                return True
-        except Exception:
-            pass  # Ignore errors
+        if not self.auth.access_token:
+            return False
         
-        return False
+        try:
+            # Prepare session data
+            data = {
+                'access_token': self.auth.access_token,
+                'user_profile': self.auth.user_profile,
+                'session_expiry': self.auth.session_expiry.isoformat() if self.auth.session_expiry else None,
+                'saved_at': datetime.now().isoformat()
+            }
+            
+            # Encrypt session data
+            json_data = json.dumps(data, indent=2)
+            encrypted_data = self._cipher.encrypt(json_data.encode())
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(self.session_file), mode=0o700, exist_ok=True)
+            
+            # Atomic write with file locking
+            temp_file = self.session_file + '.tmp'
+            with open(temp_file, 'wb') as f:
+                # Acquire exclusive lock for writing
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                
+                try:
+                    f.write(encrypted_data)
+                    f.flush()
+                    os.fsync(f.fileno())
+                finally:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            
+            # Atomically replace the original file
+            os.rename(temp_file, self.session_file)
+            
+            # Set secure file permissions
+            os.chmod(self.session_file, stat.S_IRUSR | stat.S_IWUSR)
+            
+            return True
+            
+        except Exception:
+            return False
     
     def create_session(self, request_token: str) -> Dict[str, str]:
-        """Create new session and persist it.
+        """Create new session and persist it securely.
         
         Args:
             request_token: Request token from Kite login
@@ -101,84 +171,53 @@ class SessionManager:
             Session data
         """
         result = self.auth.generate_session(request_token)
+        
+        # Set session expiry (6 AM next day)
+        now = datetime.now()
+        next_day_6am = (now + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)
+        self.auth.session_expiry = next_day_6am
+        
+        # Save encrypted session
         self._save_session()
+            
         return result
     
-    def get_valid_session(self) -> Optional[Dict[str, str]]:
-        """Get valid session, auto-refreshing if needed.
-        
-        Returns:
-            Valid session data or None
-        """
-        # Check if current session is valid
-        if self.auth.is_session_valid():
-            return self.auth.get_session_info()
-        
-        # Try auto-refresh if callback available
-        if self.auto_refresh_callback:
-            try:
-                request_token = self.auto_refresh_callback()
-                return self.create_session(request_token)
-            except Exception:
-                pass  # Auto-refresh failed
-        
-        return None
+    def is_session_valid(self) -> bool:
+        """Check if current session is valid."""
+        return self.auth.is_session_valid()
     
     def invalidate_session(self) -> bool:
-        """Invalidate current session and remove from file.
-        
-        Returns:
-            True if invalidated successfully
-        """
-        result = self.auth.invalidate_session()
-        
-        # Remove session file
+        """Invalidate current session and remove persistent data."""
         try:
-            if os.path.exists(self.session_file):
-                os.remove(self.session_file)
-        except Exception:
-            pass  # Ignore errors
-        
-        return result
-    
-    def get_auth_headers(self) -> Dict[str, str]:
-        """Get authentication headers, auto-refreshing if needed.
-        
-        Returns:
-            Authentication headers
+            self.auth.invalidate_session()
             
-        Raises:
-            AuthenticationError: If no valid session can be obtained
-        """
-        session = self.get_valid_session()
-        if not session:
-            raise AuthenticationError("No valid session available and auto-refresh failed")
+            # Remove session file securely
+            if os.path.exists(self.session_file):
+                file_size = os.path.getsize(self.session_file)
+                with open(self.session_file, 'wb') as f:
+                    f.write(os.urandom(file_size))
+                os.remove(self.session_file)
+            
+            return True
+        except Exception:
+            return False
+
+    def get_auth_headers(self) -> Dict[str, str]:
+        """Get auth headers, refreshing if necessary."""
+        if not self.is_session_valid():
+            if self.auto_refresh_callback:
+                token = self.auto_refresh_callback()
+                self.create_session(token)
+            else:
+                raise AuthenticationError("Session invalid and no refresh callback")
         
         return self.auth.get_auth_headers()
     
-    def is_session_valid(self) -> bool:
-        """Check if session is valid.
-        
-        Returns:
-            True if session is valid
-        """
-        return self.auth.is_session_valid()
-    
     def get_session_status(self) -> Dict[str, Any]:
-        """Get detailed session status.
-        
-        Returns:
-            Session status information
-        """
-        session_info = self.auth.get_session_info()
-        
+        """Get detailed session status."""
         return {
-            'is_valid': self.auth.is_session_valid(),
-            'access_token': self.auth.access_token[:10] + '...' if self.auth.access_token else None,
-            'session_expiry': session_info.get('session_expiry') if session_info else None,
+            'is_valid': self.is_session_valid(),
             'user_id': self.auth.user_profile.get('user_id') if self.auth.user_profile else None,
-            'user_name': self.auth.user_profile.get('user_name') if self.auth.user_profile else None,
-            'broker': self.auth.user_profile.get('broker') if self.auth.user_profile else None,
             'session_file': self.session_file,
             'auto_refresh_enabled': self.auto_refresh_callback is not None
         }

@@ -68,12 +68,16 @@ class KiteMarketData:
             # Convert to Quote objects
             quotes = {}
             for instrument, data in result.get('data', {}).items():
-                quotes[instrument] = Quote(**data)
+                quotes[instrument] = Quote.from_dict(data)  # Use new from_dict method
             
             return quotes
             
         except requests.exceptions.RequestException as e:
-            raise NetworkError(f"Network error while fetching quotes: {str(e)}")
+            from ..utils.error_handler import error_handler
+            error_handler.handle_request_exception(e, "quote retrieval", {
+                'instruments': instruments,
+                'count': len(instruments) if isinstance(instruments, list) else 1
+            })
     
     def get_ltp(self, instruments: Union[str, List[str]]) -> Dict[str, float]:
         """Get last traded price for instruments.
@@ -294,7 +298,8 @@ class KiteMarketData:
             response.raise_for_status()
             
             # The instruments endpoint returns CSV data
-            df = pd.read_csv(response.content.decode('utf-8').splitlines())
+            import io
+            df = pd.read_csv(io.StringIO(response.text))
             return df
             
         except requests.exceptions.RequestException as e:

@@ -13,12 +13,12 @@ class TestBasic:
         
     def test_basic_imports(self):
         """Test that we can import the library."""
-        from lib_zerodha.kite_client import KiteClient
+        from lib_zerodha import KiteClient
         assert KiteClient is not None
         
     def test_client_creation(self):
         """Test basic client creation."""
-        from lib_zerodha.kite_client import KiteClient
+        from lib_zerodha import KiteClient
         
-        client = KiteClient(api_key="test")
+        client = KiteClient(api_key="test", api_secret="secret")
         assert client.api_key == "test"

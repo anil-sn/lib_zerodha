@@ -2,6 +2,7 @@
 
 from typing import Dict, List, Optional, Union, Any
 import requests
+import json
 from datetime import datetime
 
 from ..config import config
@@ -119,7 +120,13 @@ class KiteOrders:
             return result.get('data', {}).get('order_id')
             
         except requests.exceptions.RequestException as e:
-            raise NetworkError(f"Network error during order placement: {str(e)}")
+            from ..utils.error_handler import error_handler
+            error_handler.handle_request_exception(e, "order placement", {
+                'tradingsymbol': tradingsymbol,
+                'exchange': exchange,
+                'transaction_type': transaction_type,
+                'quantity': quantity
+            })
     
     def modify_order(self,
                     order_id: str,
@@ -352,3 +359,108 @@ class KiteOrders:
             
         except requests.exceptions.RequestException as e:
             raise NetworkError(f"Network error while fetching order trades: {str(e)}")
+
+    def get_gtts(self) -> List[Dict[str, Any]]:
+        """Fetch list of GTT triggers."""
+        try:
+            response = self.session.get(
+                f"{config.BASE_URL}/gtt/triggers",
+                headers=self.get_auth_headers(),
+                timeout=config.TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json().get('data', [])
+        except requests.exceptions.RequestException as e:
+            raise NetworkError(f"Network error while fetching GTTs: {str(e)}")
+
+    def get_gtt(self, trigger_id: int) -> Dict[str, Any]:
+        """Fetch specific GTT trigger details."""
+        try:
+            response = self.session.get(
+                f"{config.BASE_URL}/gtt/triggers/{trigger_id}",
+                headers=self.get_auth_headers(),
+                timeout=config.TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json().get('data', {})
+        except requests.exceptions.RequestException as e:
+            raise NetworkError(f"Network error while fetching GTT {trigger_id}: {str(e)}")
+
+    def place_gtt(self, trigger_type: str, tradingsymbol: str, exchange: str,
+                  trigger_values: List[float], last_price: float,
+                  orders: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Place GTT order.
+        
+        Args:
+            trigger_type: 'single' or 'two-leg'
+            tradingsymbol: Trading symbol
+            exchange: Exchange
+            trigger_values: List of trigger prices
+            last_price: Current market price
+            orders: List of order dictionaries
+        """
+        if trigger_type not in ('single', 'two-leg'):
+            raise ValidationError("Invalid trigger_type. Must be 'single' or 'two-leg'")
+            
+        payload = {
+            "type": trigger_type,
+            "condition": json.dumps({
+                "exchange": exchange,
+                "tradingsymbol": tradingsymbol,
+                "trigger_values": trigger_values,
+                "last_price": last_price
+            }),
+            "orders": json.dumps(orders)
+        }
+        
+        try:
+            response = self.session.post(
+                f"{config.BASE_URL}/gtt/triggers",
+                headers=self.get_auth_headers(),
+                data=payload,
+                timeout=config.TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json().get('data', {})
+        except requests.exceptions.RequestException as e:
+            raise NetworkError(f"Network error while placing GTT: {str(e)}")
+
+    def modify_gtt(self, trigger_id: int, trigger_type: str, tradingsymbol: str, 
+                   exchange: str, trigger_values: List[float], last_price: float,
+                   orders: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Modify GTT order."""
+        payload = {
+            "type": trigger_type,
+            "condition": json.dumps({
+                "exchange": exchange,
+                "tradingsymbol": tradingsymbol,
+                "trigger_values": trigger_values,
+                "last_price": last_price
+            }),
+            "orders": json.dumps(orders)
+        }
+        
+        try:
+            response = self.session.put(
+                f"{config.BASE_URL}/gtt/triggers/{trigger_id}",
+                headers=self.get_auth_headers(),
+                data=payload,
+                timeout=config.TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json().get('data', {})
+        except requests.exceptions.RequestException as e:
+            raise NetworkError(f"Network error while modifying GTT {trigger_id}: {str(e)}")
+
+    def delete_gtt(self, trigger_id: int) -> Dict[str, Any]:
+        """Delete GTT order."""
+        try:
+            response = self.session.delete(
+                f"{config.BASE_URL}/gtt/triggers/{trigger_id}",
+                headers=self.get_auth_headers(),
+                timeout=config.TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json().get('data', {})
+        except requests.exceptions.RequestException as e:
+            raise NetworkError(f"Network error while deleting GTT {trigger_id}: {str(e)}")

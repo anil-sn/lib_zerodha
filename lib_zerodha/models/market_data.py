@@ -4,52 +4,7 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
-from .base import OHLC, DepthItem
-
-
-@dataclass
-class Quote:
-    """Real-time quote data."""
-    instrument_token: int
-    timestamp: Optional[datetime] = None
-    last_price: float = 0.0
-    last_quantity: int = 0
-    average_price: float = 0.0
-    volume: int = 0
-    buy_quantity: int = 0
-    sell_quantity: int = 0
-    ohlc: Optional[OHLC] = None
-    net_change: float = 0.0
-    oi: Optional[int] = None  # Open Interest for F&O
-    oi_day_high: Optional[int] = None
-    oi_day_low: Optional[int] = None
-    lower_circuit_limit: Optional[float] = None
-    upper_circuit_limit: Optional[float] = None
-    depth: Optional[Dict[str, Any]] = None
-    
-    def __post_init__(self):
-        """Post-initialization processing."""
-        if isinstance(self.timestamp, str):
-            self.timestamp = datetime.fromisoformat(self.timestamp.replace('Z', '+00:00'))
-    
-    @property
-    def change_percent(self) -> float:
-        """Calculate percentage change."""
-        if self.ohlc and self.ohlc.close > 0:
-            return ((self.last_price - self.ohlc.close) / self.ohlc.close) * 100
-        return 0.0
-    
-    @property
-    def is_upper_circuit(self) -> bool:
-        """Check if price hit upper circuit."""
-        return (self.upper_circuit_limit is not None and 
-                abs(self.last_price - self.upper_circuit_limit) < 0.01)
-    
-    @property
-    def is_lower_circuit(self) -> bool:
-        """Check if price hit lower circuit."""
-        return (self.lower_circuit_limit is not None and 
-                abs(self.last_price - self.lower_circuit_limit) < 0.01)
+from .base import OHLC, DepthItem, Quote
 
 
 @dataclass
@@ -63,15 +18,32 @@ class HistoricalData:
     volume: int
     oi: Optional[int] = None  # Open Interest for F&O
     
-    def __post_init__(self):
-        """Post-initialization processing."""
-        if isinstance(self.date, str):
-            self.date = datetime.fromisoformat(self.date)
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'HistoricalData':
+        """Create HistoricalData from API response with resilient parsing."""
+        from datetime import datetime
+        
+        # Parse date safely
+        date = data.get('date')
+        if isinstance(date, str):
+            date = datetime.fromisoformat(date.replace(' ', 'T'))
+        elif not isinstance(date, datetime):
+            date = datetime.now()
+        
+        return cls(
+            date=date,
+            open=float(data.get('open', 0.0)),
+            high=float(data.get('high', 0.0)),
+            low=float(data.get('low', 0.0)),
+            close=float(data.get('close', 0.0)),
+            volume=int(data.get('volume', 0)),
+            oi=data.get('oi')
+        )
     
     @property
     def ohlc(self) -> OHLC:
         """Get OHLC object."""
-        return OHLC(self.open, self.high, self.low, self.close)
+        return OHLC(self.open, self.high, self.low, self.close, self.volume)
     
     @property
     def body_size(self) -> float:
@@ -116,7 +88,37 @@ class Tick:
     ohlc: Optional[OHLC] = None
     depth: Optional[Dict[str, Any]] = None
     
-    def __post_init__(self):
-        """Post-initialization processing."""
-        if isinstance(self.timestamp, str):
-            self.timestamp = datetime.fromisoformat(self.timestamp.replace('Z', '+00:00'))
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Tick':
+        """Create Tick from WebSocket data with resilient parsing."""
+        from datetime import datetime
+        
+        # Parse timestamp safely
+        timestamp = data.get('timestamp')
+        if isinstance(timestamp, str):
+            timestamp = datetime.fromisoformat(timestamp.replace(' ', 'T'))
+        elif not isinstance(timestamp, datetime):
+            timestamp = datetime.now()
+        
+        # Handle OHLC if present
+        ohlc = None
+        if 'ohlc' in data and data['ohlc']:
+            ohlc_data = data['ohlc']
+            ohlc = OHLC(
+                open=ohlc_data.get('open', 0.0),
+                high=ohlc_data.get('high', 0.0),
+                low=ohlc_data.get('low', 0.0),
+                close=ohlc_data.get('close', 0.0),
+                volume=data.get('volume', 0)
+            )
+        
+        return cls(
+            instrument_token=int(data.get('instrument_token', 0)),
+            timestamp=timestamp,
+            last_price=float(data.get('last_price', 0.0)),
+            volume=int(data.get('volume', 0)),
+            average_price=float(data.get('average_price', 0.0)),
+            oi=data.get('oi'),
+            ohlc=ohlc,
+            depth=data.get('depth')
+        )
