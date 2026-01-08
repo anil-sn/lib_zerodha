@@ -11,10 +11,10 @@
 - [x] **GTT Support:** Implement `place_gtt`, `modify_gtt`, `delete_gtt` for Good Till Triggered orders.
 - [x] **Real-time Hardening:** Robust binary parsing and reconnection logic for WebSocket.
 - [x] **WebSocket Unification:** Merged `KiteWebSocket` and `KiteWebSocketClient` into a single robust implementation. Fixed subscription manager compatibility.
+- [x] **Mutual Funds:** Added support for Mutual Fund orders and SIPs (`mf_*` methods) via `KiteMF` and `KiteClient.mf`.
 
 ## 🚀 Future Enhancements (Post-Release)
 
-- [ ] **Mutual Funds:** Add support for Mutual Fund orders and SIPs (`mf_*` methods).
 - [ ] **AsyncIO Support:** Introduce an asynchronous client (`AsyncKiteClient`) using `aiohttp`.
 - [ ] **Advanced Analytics:** Add built-in technical indicators (RSI, MACD) to `HistoricalData`.
 - [ ] **Backtesting Engine:** Create a simple event-driven backtester using the historical data module.

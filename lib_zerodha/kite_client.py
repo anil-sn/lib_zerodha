@@ -11,6 +11,7 @@ from .orders import KiteOrders
 from .market_data import KiteMarketData
 from .portfolio import KitePortfolio
 from .derivatives import KiteFO
+from .mutual_funds.kite_mf import KiteMF
 from .realtime import KiteWebSocket
 from .config import config
 from .exceptions import LibZerodhaError, NetworkError, AuthenticationError
@@ -64,6 +65,7 @@ class KiteClient:
         self.market_data = KiteMarketData(self.session, self._get_auth_headers)
         self.portfolio = KitePortfolio(self.session, self._get_auth_headers)
         self.derivatives = KiteFO(self.session, self._get_auth_headers)
+        self.mf = KiteMF(self.session, self._get_auth_headers)
         
         # Real-time data (initialized when needed)
         self._websocket = None

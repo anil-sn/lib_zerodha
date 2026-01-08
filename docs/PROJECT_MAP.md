@@ -41,10 +41,9 @@
 ### ⚡ Realtime (`lib_zerodha/realtime/`)
 *   `kite_websocket.py`: **Primary WebSocket Implementation**.
     *   `KiteWebSocket`: Robust client with reconnection logic and binary parsing.
-*   `websocket_client.py`: **[DEPRECATED/DUPLICATE]** Alternate WebSocket implementation (to be merged/removed).
 *   `subscriptions.py`:
     *   `SubscriptionManager`: Manages groups of subscriptions and data processing.
-*   `candle_store.py`: (Assumed) logic for aggregating ticks into candles.
+*   `candle_store.py`: **[DEPRECATED]** In-memory candle aggregation (use `utils.DataProcessor` instead).
 *   `data_handlers.py`: (Assumed) handlers for different data types.
 *   `websocket_manager.py`: (Assumed) higher-level manager.
 

@@ -2,21 +2,56 @@
 
 import calendar
 from datetime import datetime, date, timedelta
-from typing import List, Optional
+from typing import List, Optional, Union
 import pandas as pd
 
 
 class ExpiryCalculator:
-    """Calculate expiry dates for various derivative instruments."""
+    """Calculate expiry dates for various derivative instruments.
     
-    # NSE holidays (sample - should be updated annually)
-    NSE_HOLIDAYS_2026 = [
+    Allows injection of custom holiday calendars for accurate calculations.
+    """
+    
+    # Default NSE holidays (fallback)
+    DEFAULT_HOLIDAYS = [
         date(2026, 1, 26),  # Republic Day
         date(2026, 3, 14),  # Holi
         date(2026, 8, 15),  # Independence Day
         date(2026, 10, 2),  # Gandhi Jayanti
         # Add more holidays as needed
     ]
+    
+    def __init__(self, holidays: Optional[List[date]] = None):
+        """Initialize ExpiryCalculator.
+        
+        Args:
+            holidays: List of holiday dates. Defaults to 2026 list if None.
+        """
+        self.holidays = holidays if holidays is not None else self.DEFAULT_HOLIDAYS.copy()
+        # Backward compatibility alias
+        self.NSE_HOLIDAYS_2026 = self.holidays
+
+    def set_holidays(self, holidays: List[date]):
+        """Set the holiday calendar.
+        
+        Args:
+            holidays: List of holiday dates
+        """
+        self.holidays = sorted(holidays)
+        self.NSE_HOLIDAYS_2026 = self.holidays
+
+    def add_holiday(self, holiday: Union[date, str]):
+        """Add a single holiday to the calendar.
+        
+        Args:
+            holiday: Date object or string 'YYYY-MM-DD'
+        """
+        if isinstance(holiday, str):
+            holiday = datetime.strptime(holiday, '%Y-%m-%d').date()
+        
+        if holiday not in self.holidays:
+            self.holidays.append(holiday)
+            self.holidays.sort()
     
     def get_nearest_expiry(self, instruments_df: pd.DataFrame) -> date:
         """Get nearest expiry date from instruments DataFrame.
@@ -66,10 +101,10 @@ class ExpiryCalculator:
             last_date -= timedelta(days=1)
         
         # Check if it's a holiday
-        if last_date in self.NSE_HOLIDAYS_2026:
+        if last_date in self.holidays:
             # Move to previous trading day
             last_date -= timedelta(days=1)
-            while last_date.weekday() >= 5 or last_date in self.NSE_HOLIDAYS_2026:
+            while last_date.weekday() >= 5 or last_date in self.holidays:
                 last_date -= timedelta(days=1)
         
         return last_date
@@ -100,11 +135,11 @@ class ExpiryCalculator:
             raise ValueError(f"Week {week} Thursday is not in month {month}")
         
         # Check if it's a holiday
-        if target_thursday in self.NSE_HOLIDAYS_2026:
+        if target_thursday in self.holidays:
             # Move to previous trading day
             target_thursday -= timedelta(days=1)
             while (target_thursday.weekday() >= 5 or 
-                   target_thursday in self.NSE_HOLIDAYS_2026):
+                   target_thursday in self.holidays):
                 target_thursday -= timedelta(days=1)
         
         return target_thursday
@@ -186,7 +221,7 @@ class ExpiryCalculator:
             return False
         
         # Check if it's a holiday
-        if check_date in self.NSE_HOLIDAYS_2026:
+        if check_date in self.holidays:
             return False
         
         return True
